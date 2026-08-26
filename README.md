@@ -10,7 +10,12 @@ L'obiettivo tecnico è costruire una pipeline end-to-end — dalla pulizia dati 
 
 [Formula 1 World Championship (1950-2024)](https://www.kaggle.com/datasets/rohanrao/formula-1-world-championship-1950-2020) di rohanrao su Kaggle, basato sui dati storici Ergast/Jolpica-F1. Struttura relazionale multi-tabella (gare, risultati, piloti, costruttori, qualifiche, standings).
 
-> I dati grezzi non sono inclusi nel repository (vedi `.gitignore`). Per riprodurre il progetto, scarica il dataset dal link sopra ed estrailo in `data/raw/`.
+> I dati grezzi non sono inclusi nel repository (vedi `.gitignore`). 
+> Per scaricarli:
+> 1. Installa il Kaggle CLI: `pip install kaggle` (già in `requirements.txt`)
+> 2. Genera un token API da kaggle.com/settings → API → Create New Token
+> 3. Posizionalo in `~/.kaggle/kaggle.json` (permessi `chmod 600`)
+> 4. Esegui `./scripts/download_data.sh`
 
 ## Struttura del progetto
 
