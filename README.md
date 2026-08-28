@@ -32,6 +32,19 @@ Ogni feature è calcolata usando **solo gare precedenti** a quella in esame (`sh
 
 **Gestione dei valori mancanti**: le prime gare in assoluto di un pilota/scuderia nel dataset non hanno storico da cui calcolare nulla — quelle righe (~1-2% del totale) vengono eliminate. Per lo storico pilota-circuito, mancante nel 26% dei casi (molto più comune: basta non aver mai corso su quel tracciato specifico), si usa la forma generale del pilota come stima di fallback, accompagnata da un flag esplicito (`no_circuit_history`) che segnala al modello quando manca lo storico reale.
 
+## Modello baseline
+
+Logistic Regression, `class_weight="balanced"`, split temporale (train 2004-2022, test 2023-2024).
+
+Risultati sulla classe Podio:
+- Precision: 0.42
+- Recall: 0.91
+- F1-score: 0.58
+- Accuracy complessiva: 0.80
+
+Il modello preferisce nettamente il falso allarme alla previsione mancata (126 podi individuati su 138 reali, ma 174 falsi positivi su 300 podi previsti) — conseguenza diretta di `class_weight="balanced"`. Prossimo step: confronto con soglie di decisione diverse e Random Forest.
+
+
 ## Decisioni chiave
 
 - **Range dati: 2004-2024**, non l'intero storico. Il tracciamento del giro veloce (introdotto nel 2004) è risultato troppo predittivo per scartarlo restando su un range più ampio.
@@ -62,12 +75,13 @@ pip install -r requirements.txt
 
 ## Stato del progetto
 
-🚧 In sviluppo — Fase 1: analisi esplorativa e primo modello sui dati storici.
+🚧 In sviluppo — Fase 1 e 2 completate. Fase 3: baseline addestrato e valutato, confronto con soglie alternative e Random Forest in corso.
 
 ## Roadmap
 
 - [x] Setup ambiente e struttura progetto
-- [ ] Analisi esplorativa dei dati (EDA)
-- [ ] Feature engineering (senza data leakage temporale)
-- [ ] Training e valutazione di modelli di classificazione
+- [x] Analisi esplorativa dei dati
+- [x] Feature engineering senza data leakage
+- [x] Modello baseline (Logistic Regression)
+- [ ] Confronto con Random Forest e soglie di decisione alternative
 - [ ] Pipeline di aggiornamento con dati recenti (API Jolpica-F1)
