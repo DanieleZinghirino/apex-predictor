@@ -80,6 +80,7 @@ python3 run_pipeline.py
 ```
 
 Carica i dati, costruisce le feature, allena il modello Random Forest, lo valuta sul test set 2023-2024 e salva modello + configurazione in `models/`.
+I percorsi dei dati e dei modelli sono calcolati rispetto alla root del progetto (non alla working directory corrente), quindi lo script funziona correttamente da qualunque cartella lo si lanci.
 
 ## Stato del progetto
 
