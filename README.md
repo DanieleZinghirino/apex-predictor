@@ -71,6 +71,16 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Eseguire la pipeline completa
+
+Oltre ai notebook (che documentano il processo esplorativo), il progetto include una pipeline eseguibile end-to-end:
+
+```bash
+python3 run_pipeline.py
+```
+
+Carica i dati, costruisce le feature, allena il modello Random Forest, lo valuta sul test set 2023-2024 e salva modello + configurazione in `models/`.
+
 ## Stato del progetto
 
 🚧 In sviluppo — Fasi 1, 2 e 3 completate: EDA, feature engineering, modello finale selezionato e validato (Random Forest).
@@ -81,4 +91,5 @@ pip install -r requirements.txt
 - [x] Analisi esplorativa dei dati
 - [x] Feature engineering senza data leakage
 - [x] Confronto modelli (Logistic Regression, Random Forest) e selezione finale
+- [x] Codice trasferito in `src/` (moduli riutilizzabili e testabili)
 - [ ] Pipeline di aggiornamento con dati recenti (API Jolpica-F1)
