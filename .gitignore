@@ -10,3 +10,6 @@ token.txt
 
 # Data
 data/*
+
+# Models
+models/*
