@@ -51,6 +51,23 @@ Risultati sulla classe Podio:
 | Random Forest, soglia 0.5              | 0.49      | 0.91     | 0.64     |
 | **Random Forest, soglia 0.6 (finale)** | **0.54**  | **0.88** | **0.67** |
 
+## Confronto sistematico tra modelli
+
+Per validare la scelta di Random Forest, sono stati confrontati 8 algoritmi (Decision Tree, Logistic Regression, KNN, Naive Bayes, Random Forest, Gradient Boosting, XGBoost, SVM), tutti sullo stesso split temporale, ciascuno valutato alla propria soglia di decisione ottimale (massimo F1).
+
+| Modello | F1 (classe Podio) |
+|---|---|
+| **Random Forest** | **0.674** |
+| Decision Tree | 0.664 |
+| KNN | 0.657 |
+| Gradient Boosting | 0.655 |
+| Logistic Regression | 0.641 |
+| XGBoost | 0.638 |
+| SVM | 0.625 |
+| Naive Bayes | 0.598 |
+
+Random Forest vince ma con margine ridotto su Decision Tree — segnale che un singolo albero ben regolarizzato cattura già gran parte del segnale disponibile con queste 6 feature. XGBoost, sorprendentemente sotto le aspettative rispetto alla sua reputazione su dati tabellari, non ha ricevuto hyperparameter tuning in questo confronto: è l'algoritmo che più beneficerebbe di una ricerca sistematica degli iperparametri, possibile estensione futura. Dettaglio completo in `notebooks/03_model_comparison.ipynb`.
+
 ## Struttura del progetto
 apex-predictor/
 ├── data/
@@ -91,6 +108,6 @@ I percorsi dei dati e dei modelli sono calcolati rispetto alla root del progetto
 - [x] Setup ambiente e struttura progetto
 - [x] Analisi esplorativa dei dati
 - [x] Feature engineering senza data leakage
-- [x] Confronto modelli (Logistic Regression, Random Forest) e selezione finale
+- [x] Confronto modelli e selezione finale
 - [x] Codice trasferito in `src/` (moduli riutilizzabili e testabili)
 - [ ] Pipeline di aggiornamento con dati recenti (API Jolpica-F1)
