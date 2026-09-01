@@ -58,14 +58,6 @@ Dettaglio completo in `notebooks/03_model_comparison.ipynb` e `notebooks/04_hype
 
 Il pattern generale conferma quanto visto con Random Forest: griglia e forma recente del pilota dominano nettamente, mentre storico circuito e affidabilità scuderia aggiungono poco. XGBoost tunato si affida ancora più fortemente alla griglia (49% vs 43%) — coerente con la sua calibrazione verso la precision: il segnale più diretto e meno rumoroso riduce il rischio di falsi allarmi.
 
-
-| Esperimento                            | Precision | Recall   | F1       |
-|----------------------------------------|-----------|----------|----------|
-| Logistic Regression, soglia 0.5        | 0.42      | 0.91     | 0.58     |
-| Logistic Regression, soglia 0.8        | 0.59      | 0.67     | 0.63     |
-| Random Forest, soglia 0.5              | 0.49      | 0.91     | 0.64     |
-| **Random Forest, soglia 0.6 (finale)** | **0.54**  | **0.88** | **0.67** |
-
 ## Confronto sistematico tra modelli
 
 Come primo passo di validazione, sono stati confrontati 8 algoritmi (Decision Tree, Logistic Regression, KNN, Naive Bayes, Random Forest, Gradient Boosting, XGBoost, SVM), tutti sullo stesso split temporale, ciascuno alla propria soglia di decisione ottimale (massimo F1), **senza hyperparameter tuning**.
