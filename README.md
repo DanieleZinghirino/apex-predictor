@@ -71,6 +71,12 @@ Dettaglio completo in `notebooks/04_hyperparameter_tuning.ipynb`.
 
 Il pattern generale conferma quanto visto con Random Forest: griglia e forma recente del pilota dominano nettamente, mentre storico circuito e affidabilità scuderia aggiungono poco. XGBoost tunato si affida ancora più fortemente alla griglia, coerente con la sua calibrazione verso la precision: il segnale più diretto e meno rumoroso riduce il rischio di falsi allarmi.
 
+## Aggiornamento dati live (Jolpica-F1)
+
+Il dataset storico Kaggle si ferma al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1) (successore open-source di Ergast, mantenuta da volontari — rate limit rispettati: 4 richieste/secondo, 500/ora) per estendere lo storico con le stagioni successive e generare previsioni sulla prossima gara.
+
+**Stato**: client base scritto e testato (recupero prossima gara, griglia di qualifica, risultati gara). In corso: script di backfill per integrare le stagioni 2025-2026 nel dataset storico, con mappatura tra gli ID testuali di Jolpica (`driverRef`, `constructorRef`) e gli ID numerici del dataset Kaggle.
+
 ## Struttura del progetto
 
 apex-predictor/
@@ -114,4 +120,6 @@ Carica i dati, costruisce le feature, allena il modello campione (XGBoost tunato
 - [x] Confronto sistematico tra 8 algoritmi di classificazione
 - [x] Hyperparameter tuning (Random Forest, XGBoost) con validazione temporale
 - [x] Codice trasferito in `src/` (moduli riutilizzabili e testabili)
-- [ ] Pipeline di aggiornamento con dati recenti (API Jolpica-F1)
+- [x] Client API Jolpica-F1 (prossima gara, qualifiche, risultati)
+- [ ] Script di backfill storico 2025-2026 (mappatura ID, aggiornamento CSV)
+- [ ] Generazione previsioni su gara futura

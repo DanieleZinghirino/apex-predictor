@@ -9,7 +9,7 @@ from xgboost import XGBClassifier
 
 from src.data_loading import load_raw_data, build_working_dataset
 from src.features import build_all_features
-from src.train import temporal_split, evaluate_model, save_model, FEATURE_COLS
+from src.train import temporal_split, evaluate_model, save_model, FEATURE_COL
 
 MODEL_THRESHOLD = 0.75
 
@@ -43,7 +43,7 @@ train_df, test_df = temporal_split(df, test_start_year=2023)
 print(f"   Train: {train_df.shape[0]} righe, Test: {test_df.shape[0]} righe")
 
 print("5. Training del modello (XGBoost, iperparametri ottimizzati)...")
-X_train, y_train = train_df[FEATURE_COLS], train_df["podium"]
+X_train, y_train = train_df[FEATURE_COL], train_df["podium"]
 scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
 
 model = XGBClassifier(scale_pos_weight=scale_pos_weight, **XGB_PARAMS)
