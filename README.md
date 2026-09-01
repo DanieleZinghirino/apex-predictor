@@ -30,18 +30,33 @@ Ogni feature usa solo gare precedenti a quella in esame (mai la gara corrente o 
 
 Valori mancanti: eliminati per forma pilota/affidabilità scuderia (~1-2%, prime apparizioni in assoluto); per lo storico circuito (26% mancante) si usa la forma generale del pilota come fallback, con un flag esplicito (`no_circuit_history`) che segnala al modello quando è una stima.
 
-## Modello finale: Random Forest
+## Dal confronto al modello campione
 
-Confrontati due algoritmi (Logistic Regression, Random Forest) e diverse soglie di decisione, sullo stesso split temporale (train 2004-2022, test 2023-2024). 
-Il migliore: **Random Forest, soglia 0.6**.
+Dopo il primo modello (Random Forest, F1 0.674), sono stati condotti due approfondimenti per validare e rifinire la scelta.
 
-Risultati sulla classe Podio:
-- Precision: 0.54
-- Recall: 0.88 (122 podi individuati su 138 reali)
-- F1-score: 0.67
-- Accuracy complessiva: 0.87
+**Confronto sistematico** — 8 algoritmi testati sullo stesso split temporale (Decision Tree, Logistic Regression, KNN, Naive Bayes, Random Forest, Gradient Boosting, XGBoost, SVM). Random Forest si è confermato il migliore, ma con margine ridotto su Decision Tree — segnale che un albero singolo ben regolarizzato cattura già gran parte del segnale disponibile con queste 6 feature.
 
-**Feature importance**: la posizione in griglia resta il fattore singolo più predittivo (43%), ma la forma recente del pilota (punti + posizione media) pesa quasi altrettanto in blocco (46%). Storico sul circuito (9%) e affidabilità scuderia (2.5%) contribuiscono meno del previsto.
+**Hyperparameter tuning** — Random Forest e XGBoost (il modello con più margine di miglioramento nel confronto) sono stati ottimizzati con `RandomizedSearchCV` e `TimeSeriesSplit` (validazione incrociata che rispetta l'ordine cronologico, mai mescolando futuro e passato). Il tuning ha ribaltato il verdetto: **XGBoost tunato è il nuovo modello campione**.
+
+| Modello | Soglia | Precision | Recall | F1 |
+|---|---|---|---|---|
+| Random Forest (originale) | 0.60 | 0.545 | 0.884 | 0.674 |
+| Random Forest (tunato) | 0.80 | 0.664 | 0.674 | 0.669 |
+| XGBoost (originale) | 0.40 | 0.509 | 0.855 | 0.638 |
+| **XGBoost (tunato, finale)** | **0.75** | **0.628** | **0.746** | **0.682** |
+
+**Perché XGBoost tunato, nonostante il margine di F1 minimo**: la scelta finale non si basa solo sul punteggio aggregato, ma sul caso d'uso del progetto — generare previsioni condivise pubblicamente con persone interessate. In questo contesto un falso allarme è visibile e verificabile (la gara si corre, l'errore si vede), quindi la **precision alta** (0.628, la più alta tra tutti i modelli testati) conta più della recall: meglio segnalare meno podi ma con più affidabilità, piuttosto che coprirne di più a costo di previsioni sbagliate frequenti.
+
+Dettaglio completo in `notebooks/03_model_comparison.ipynb` e `notebooks/04_hyperparameter_tuning.ipynb`.
+
+## Feature importance (XGBoost, modello finale)
+
+- **`grid`** (49%) — la posizione di partenza pesa ancora di più che in Random Forest (43%): XGBoost, ottimizzato per precision alta, si affida fortemente al segnale più diretto e affidabile disponibile
+- **`driver_recent_position_avg`** (32%) — la forma recente del pilota resta il secondo fattore più importante, sostanzialmente in linea con Random Forest
+- **`driver_recent_points_avg`** (9%) — contributo più contenuto rispetto a Random Forest, probabile ridondanza parziale con la feature precedente (le due sono correlate, e XGBoost tende a "specializzarsi" su una delle due varianti ridondanti più di quanto faccia Random Forest)
+- **`no_circuit_history`, `driver_circuit_avg_position`, `constructor_reliability`** (4%, 3%, 2%) — contributo marginale, coerente con quanto già osservato in precedenza
+
+Il pattern generale conferma quanto visto con Random Forest: griglia e forma recente del pilota dominano nettamente, mentre storico circuito e affidabilità scuderia aggiungono poco. XGBoost tunato si affida ancora più fortemente alla griglia (49% vs 43%) — coerente con la sua calibrazione verso la precision: il segnale più diretto e meno rumoroso riduce il rischio di falsi allarmi.
 
 
 | Esperimento                            | Precision | Recall   | F1       |
@@ -53,11 +68,11 @@ Risultati sulla classe Podio:
 
 ## Confronto sistematico tra modelli
 
-Per validare la scelta di Random Forest, sono stati confrontati 8 algoritmi (Decision Tree, Logistic Regression, KNN, Naive Bayes, Random Forest, Gradient Boosting, XGBoost, SVM), tutti sullo stesso split temporale, ciascuno valutato alla propria soglia di decisione ottimale (massimo F1).
+Come primo passo di validazione, sono stati confrontati 8 algoritmi (Decision Tree, Logistic Regression, KNN, Naive Bayes, Random Forest, Gradient Boosting, XGBoost, SVM), tutti sullo stesso split temporale, ciascuno alla propria soglia di decisione ottimale (massimo F1), **senza hyperparameter tuning**.
 
 | Modello | F1 (classe Podio) |
 |---|---|
-| **Random Forest** | **0.674** |
+| Random Forest | 0.674 |
 | Decision Tree | 0.664 |
 | KNN | 0.657 |
 | Gradient Boosting | 0.655 |
@@ -66,7 +81,7 @@ Per validare la scelta di Random Forest, sono stati confrontati 8 algoritmi (Dec
 | SVM | 0.625 |
 | Naive Bayes | 0.598 |
 
-Random Forest vince ma con margine ridotto su Decision Tree — segnale che un singolo albero ben regolarizzato cattura già gran parte del segnale disponibile con queste 6 feature. XGBoost, sorprendentemente sotto le aspettative rispetto alla sua reputazione su dati tabellari, non ha ricevuto hyperparameter tuning in questo confronto: è l'algoritmo che più beneficerebbe di una ricerca sistematica degli iperparametri, possibile estensione futura. Dettaglio completo in `notebooks/03_model_comparison.ipynb`.
+Random Forest risultava il migliore, ma con margine ridotto su Decision Tree — segnale che un singolo albero ben regolarizzato cattura già gran parte del segnale disponibile con queste 6 feature. XGBoost, sorprendentemente indietro rispetto alla sua reputazione su dati tabellari, non aveva ricevuto alcun tuning in questo confronto — un'ipotesi poi confermata (vedi sezione successiva). Dettaglio in `notebooks/03_model_comparison.ipynb`.
 
 ## Struttura del progetto
 apex-predictor/

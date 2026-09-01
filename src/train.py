@@ -3,9 +3,11 @@ Training e valutazione del modello
 """
 import joblib
 import json
-import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
+import os
+
+os.makedirs("../models", exist_ok=True)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURE_COL = [
@@ -50,7 +52,7 @@ def train_model(train_df, n_estimators=200, max_depth=8, random_state=42):
         max_depth=max_depth,
         class_weight="balanced",
         random_state=random_state,
-        n_jobs=1,
+        n_jobs=-1,
     )
 
     model.fit(X_train, y_train)
@@ -77,25 +79,28 @@ def evaluate_model(model, test_df, threshold=0.6):
 
     return classification_report(y_test, y_pred, target_names=["Non podio", "Podio"])
 
-def save_model(model, threshold=0.6, output_dir=None):
+def save_model(model, threshold=0.75, output_dir=None):
     """
-    Salva il modello e la sua configurazione
-    
+    Salva il modello e la sua configurazione (inclusa la soglia,
+    parte essenziale della "ricetta" del modello).
+
     Parametri:
         model: modello addestrato da salvare
-        threshold: soglia di decisione da salvare insieme al modello
+        threshold: soglia di decisione da salvare insieme al modello (default 0.75, calibrata per XGBoost tunato, priorità a precision alta per previsioni pubbliche affidabili)
         output_dir: cartella di destinazione. Se None, usa models/ relativo alla root del progetto
     """
     if output_dir is None:
         output_dir = os.path.join(PROJECT_ROOT, "models")
+
     os.makedirs(output_dir, exist_ok=True)
 
-    model_path = f"{output_dir}/random_forest_final.pkl"
+    model_path = f"{output_dir}/model_final.pkl"
     config_path = f"{output_dir}/model_config.json"
 
     joblib.dump(model, model_path)
     with open(config_path, "w") as f:
-        json.dump({"threshold": threshold, "model_file": "random_forest_final.pkl"}, f, indent=2)
+        json.dump({"threshold": threshold, "model_file": "model_final.pkl",
+                   "model_type": "XGBoost"}, f, indent=2)
 
     print(f"Modello salvato in {model_path}")
     print(f"Configurazione salvata in {config_path}")
