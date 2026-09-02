@@ -15,7 +15,7 @@ def load_raw_data(data_dir=None):
         data_dir: percorso della cartella con i dati CSV grezzi. Se None, usa data/raw relativo alla root del progetto indipendentemente da dove viene lanciato lo script
         
     Ritorna:
-        dizionario con chiavi 'races', 'results', 'drivers'. 'constructors' e i rispettivi DataFrame come valori
+        dizionario con chiavi 'races', 'results', 'drivers'. 'constructors', 'circuits' e i rispettivi DataFrame come valori
     """
     if data_dir is None:
         data_dir = os.path.join(PROJECT_ROOT, "data", "raw")
@@ -24,12 +24,14 @@ def load_raw_data(data_dir=None):
     results = pd.read_csv(f"{data_dir}/results.csv", na_values=NA_VALUES)
     drivers = pd.read_csv(f"{data_dir}/drivers.csv", na_values=NA_VALUES)
     constructors = pd.read_csv(f"{data_dir}/constructors.csv", na_values=NA_VALUES)
+    circuits = pd.read_csv(f"{data_dir}/circuits.csv", na_values=NA_VALUES)
 
     return {
         "races": races,
         "results": results,
         "drivers": drivers,
         "constructors": constructors,
+        "circuits": circuits,
     }
 
 def build_working_dataset(races, results, min_year=2004):

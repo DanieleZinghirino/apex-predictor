@@ -58,7 +58,6 @@ Random Forest e XGBoost sono stati ottimizzati con `RandomizedSearchCV` e `TimeS
 | XGBoost (originale) | 0.40 | 0.509 | 0.855 | 0.638 |
 | **XGBoost (tunato, finale)** | **0.75** | **0.628** | **0.746** | **0.682** |
 
-**Perché XGBoost tunato, nonostante il margine di F1 minimo**: la scelta finale non si basa solo sul punteggio aggregato, ma sul caso d'uso del progetto, generare previsioni condivise pubblicamente con persone interessate. In questo contesto un falso allarme è visibile e verificabile (la gara si corre, l'errore si vede), quindi la **precision alta** (0.628, la più alta tra tutti i modelli testati) conta più della recall.
 
 Dettaglio completo in `notebooks/04_hyperparameter_tuning.ipynb`.
 
@@ -73,7 +72,7 @@ Il pattern generale conferma quanto visto con Random Forest: griglia e forma rec
 
 ## Aggiornamento dati live (Jolpica-F1)
 
-Il dataset storico Kaggle si ferma al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1) (successore open-source di Ergast, mantenuta da volontari — rate limit rispettati: 4 richieste/secondo, 500/ora) per estendere lo storico con le stagioni successive e generare previsioni sulla prossima gara.
+Il dataset storico Kaggle si ferma al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1) per estendere lo storico con le stagioni successive e generare previsioni sulla prossima gara.
 
 **Stato**: client base scritto e testato (recupero prossima gara, griglia di qualifica, risultati gara). In corso: script di backfill per integrare le stagioni 2025-2026 nel dataset storico, con mappatura tra gli ID testuali di Jolpica (`driverRef`, `constructorRef`) e gli ID numerici del dataset Kaggle.
 

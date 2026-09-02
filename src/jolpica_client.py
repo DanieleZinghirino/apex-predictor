@@ -139,7 +139,7 @@ def get_race_results(season, round_number):
             "driver_ref": entry["Driver"]["driverId"],
             "constructor_ref": entry["Constructor"]["constructorId"],
             "grid": int(entry["grid"]),
-            "position_order": int(entry["positionOrder"]),
+            "position_order": int(entry["position"]),  # <-- corretto: "position", non "positionOrder"
             "points": float(entry["points"]),
             "finished": entry["positionText"] not in non_finish_codes,
         }
