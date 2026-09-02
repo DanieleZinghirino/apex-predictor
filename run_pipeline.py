@@ -9,7 +9,10 @@ from xgboost import XGBClassifier
 
 from src.data_loading import load_raw_data, build_working_dataset
 from src.features import build_all_features
-from src.train import temporal_split, evaluate_model, save_model, FEATURE_COL
+from src.train import (
+    temporal_split, train_champion_model, find_best_threshold,
+    evaluate_model, save_model
+)
 
 MODEL_THRESHOLD = 0.75
 
@@ -38,22 +41,22 @@ print("3. Feature engineering...")
 df = build_all_features(df, n_races=10)
 print(f"   Righe dopo pulizia NaN: {df.shape[0]}")
 
-print("4. Split temporale train/test...")
-train_df, test_df = temporal_split(df, test_start_year=2023)
+print("4. Split temporale train/test (train < 2025, test 2025-2026)...")
+train_df, test_df = temporal_split(df)
 print(f"   Train: {train_df.shape[0]} righe, Test: {test_df.shape[0]} righe")
 
-print("5. Training del modello (XGBoost, iperparametri ottimizzati)...")
-X_train, y_train = train_df[FEATURE_COL], train_df["podium"]
-scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()
+print("5. Training del modello campione (XGBoost)...")
+model = train_champion_model(train_df)
 
-model = XGBClassifier(scale_pos_weight=scale_pos_weight, **XGB_PARAMS)
-model.fit(X_train, y_train)
+print("6. Ricerca soglia ottimale...")
+best = find_best_threshold(model, test_df)
+print(f"   Soglia ottimale: {best['threshold']:.2f}")
+print(f"   Precision: {best['precision']:.3f}, Recall: {best['recall']:.3f}, F1: {best['f1']:.3f}")
 
-print("6. Valutazione...")
-report = evaluate_model(model, test_df, threshold=MODEL_THRESHOLD)
-print(report)
+print("\n7. Valutazione completa alla soglia scelta...")
+print(evaluate_model(model, test_df, threshold=best["threshold"]))
 
-print("7. Salvataggio modello...")
-save_model(model, threshold=MODEL_THRESHOLD, output_dir="models")
+print("8. Salvataggio modello...")
+save_model(model, threshold=best["threshold"])
 
 print("\nPipeline completata con successo.")

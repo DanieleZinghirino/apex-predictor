@@ -47,17 +47,21 @@ Come primo passo di validazione, sono stati confrontati 8 algoritmi (Decision Tr
 
 Random Forest risultava il migliore, ma con margine ridotto su Decision Tree, segnale che un singolo albero ben regolarizzato cattura già gran parte del segnale disponibile con queste 6 feature. XGBoost, sorprendentemente indietro rispetto alla sua reputazione su dati tabellari, non aveva ricevuto alcun tuning in questo confronto, un'ipotesi poi confermata nella sezione successiva. Dettaglio in `notebooks/03_model_comparison.ipynb`.
 
-## Hyperparameter tuning e modello campione finale
+## Modello campione finale
 
-Random Forest e XGBoost sono stati ottimizzati con `RandomizedSearchCV` e `TimeSeriesSplit` (validazione incrociata che rispetta l'ordine cronologico, mai mescolando futuro e passato). Il tuning ha ribaltato il verdetto: **XGBoost tunato è il modello campione**.
+Il modello (XGBoost, iperparametri da `RandomizedSearchCV` + `TimeSeriesSplit`, dettaglio in `notebooks/04_hyperparameter_tuning.ipynb`) è addestrato su dati fino al 2024 e validato sulle stagioni 2025-2026, integrate nello storico tramite l'API Jolpica-F1 (vedi sezione successiva).
 
-| Modello | Soglia | Precision | Recall | F1 |
-|---|---|---|---|---|
-| Random Forest (originale) | 0.60 | 0.545 | 0.884 | 0.674 |
-| Random Forest (tunato) | 0.80 | 0.664 | 0.674 | 0.669 |
-| XGBoost (originale) | 0.40 | 0.509 | 0.855 | 0.638 |
-| **XGBoost (tunato, finale)** | **0.75** | **0.628** | **0.746** | **0.682** |
+| | Valore |
+|---|---|
+| Soglia di decisione | 0.75 |
+| Precision (Podio) | 0.629 |
+| Recall (Podio) | 0.833 |
+| F1 (Podio) | 0.717 |
+| Accuracy complessiva | 0.90 |
 
+La soglia è calibrata per **precision alta**: il progetto genera previsioni condivise pubblicamente, dove un falso allarme è visibile e verificabile appena la gara si corre, meglio segnalare meno podi con più affidabilità.
+
+Nota: questi numeri sono leggermente migliori di quelli misurati sul test set precedente (2023-2024, F1 0.682), segnale incoraggiante di buona generalizzazione su dati più recenti, non ancora un pattern consolidato su cui trarre conclusioni definitive.
 
 Dettaglio completo in `notebooks/04_hyperparameter_tuning.ipynb`.
 
@@ -72,9 +76,12 @@ Il pattern generale conferma quanto visto con Random Forest: griglia e forma rec
 
 ## Aggiornamento dati live (Jolpica-F1)
 
-Il dataset storico Kaggle si ferma al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1) per estendere lo storico con le stagioni successive e generare previsioni sulla prossima gara.
+Il dataset storico Kaggle si fermava al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1), usato da `scripts/update_data.py` per integrare le stagioni 2025 e parte del 2026 (fino al 23 agosto 2026) nello storico locale, con mappatura automatica tra gli ID testuali di Jolpica (`driverRef`, `constructorRef`, `circuitRef`) e gli ID numerici del dataset Kaggle, creando nuovi ID per piloti/costruttori non presenti nel dump originale
 
-**Stato**: client base scritto e testato (recupero prossima gara, griglia di qualifica, risultati gara). In corso: script di backfill per integrare le stagioni 2025-2026 nel dataset storico, con mappatura tra gli ID testuali di Jolpica (`driverRef`, `constructorRef`) e gli ID numerici del dataset Kaggle.
+Per rieseguire l'aggiornamento (idempotente, salta le gare già presenti):
+```bash
+python3 scripts/update_data.py
+```
 
 ## Struttura del progetto
 
@@ -109,7 +116,7 @@ Carica i dati, costruisce le feature, allena il modello campione (XGBoost tunato
 
 ## Stato del progetto
 
-🚧 In sviluppo, Fasi 1, 2 e 3 completate: EDA, feature engineering, confronto sistematico, hyperparameter tuning, modello campione finale selezionato (XGBoost tunato).
+🚧 In sviluppo — Storico esteso a 2025-2026 via Jolpica-F1, modello ri-addestrato e validato sul periodo più recente. Prossimo passo: generazione previsioni sulla prossima gara.
 
 ## Roadmap
 
@@ -117,8 +124,7 @@ Carica i dati, costruisce le feature, allena il modello campione (XGBoost tunato
 - [x] Analisi esplorativa dei dati
 - [x] Feature engineering senza data leakage
 - [x] Confronto sistematico tra 8 algoritmi di classificazione
-- [x] Hyperparameter tuning (Random Forest, XGBoost) con validazione temporale
+- [x] Hyperparameter tuning con validazione temporale
 - [x] Codice trasferito in `src/` (moduli riutilizzabili e testabili)
-- [x] Client API Jolpica-F1 (prossima gara, qualifiche, risultati)
-- [ ] Script di backfill storico 2025-2026 (mappatura ID, aggiornamento CSV)
-- [ ] Generazione previsioni su gara futura
+- [x] Backfill storico 2025-2026 via Jolpica-F1
+- [ ] Generazione previsioni sulla prossima gara (Gran Premio d'Italia, 6 settembre 2026)

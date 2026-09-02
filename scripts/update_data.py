@@ -173,11 +173,18 @@ def build_new_rows(race, results, driver_map, constructor_map, circuit_map,
     for r in results:
         driver_id, drivers_df = resolve_or_create_id(
             r["driver_ref"], driver_map, "driverId", drivers_df,
-            extra_fields={"driverRef": r["driver_ref"]}
+            extra_fields={
+                "driverRef": r["driver_ref"],
+                "surname": r["driver_surname"],
+                "forename": r["driver_forename"],
+            }
         )
         constructor_id, constructors_df = resolve_or_create_id(
             r["constructor_ref"], constructor_map, "constructorId", constructors_df,
-            extra_fields={"constructorRef": r["constructor_ref"]}
+            extra_fields={
+                "constructorRef": r["constructor_ref"],
+                "name": r["constructor_name"],
+            }
         )
 
         # 'position' è NaN per i non classificati
@@ -217,6 +224,16 @@ def main():
     races_df = data["races"]
     results_df = data["results"]
 
+    data_dir = os.path.join(PROJECT_ROOT, "data", "raw")
+
+    # Backup UNA volta sola, prima di iniziare, non ad ogni gara
+    backup_dir = os.path.join(data_dir, "backup_pre_update")
+    os.makedirs(backup_dir, exist_ok=True)
+    for fname in ["races.csv", "results.csv", "drivers.csv", "constructors.csv"]:
+        src = os.path.join(data_dir, fname)
+        if os.path.exists(src):
+            pd.read_csv(src).to_csv(os.path.join(backup_dir, fname), index=False)
+
     for race in new_races:
         print(f"\nScaricamento: {race['season']} round {race['round']} — {race['race_name']}")
         results = get_race_results(race["season"], race["round"])
@@ -229,23 +246,17 @@ def main():
             race, results, driver_map, constructor_map, circuit_map,
             drivers_df, constructors_df, races_df, results_df
         )
+
         if new_id:
             print(f"  Aggiunta come raceId={new_id}, {len(results)} risultati")
 
-    # Backup dei CSV originali prima di sovrascrivere; rete di sicurezza in caso qualcosa vada storto durante la scrittura
-    data_dir = os.path.join(PROJECT_ROOT, "data", "raw")
-    backup_dir = os.path.join(data_dir, "backup_pre_update")
-    os.makedirs(backup_dir, exist_ok=True)
-    for fname in ["races.csv", "results.csv", "drivers.csv", "constructors.csv"]:
-        src = os.path.join(data_dir, fname)
-        if os.path.exists(src):
-            pd.read_csv(src).to_csv(os.path.join(backup_dir, fname), index=False)
-
-    print("\nSalvataggio CSV aggiornati...")
-    races_df.to_csv(os.path.join(data_dir, "races.csv"), index=False)
-    results_df.to_csv(os.path.join(data_dir, "results.csv"), index=False)
-    drivers_df.to_csv(os.path.join(data_dir, "drivers.csv"), index=False)
-    constructors_df.to_csv(os.path.join(data_dir, "constructors.csv"), index=False)
+            # Salvataggio incrementale: dopo OGNI gara aggiunta con successo,
+            # non solo alla fine — così un crash a metà perde al massimo
+            # la gara in corso, non tutto il lavoro già fatto
+            races_df.to_csv(os.path.join(data_dir, "races.csv"), index=False)
+            results_df.to_csv(os.path.join(data_dir, "results.csv"), index=False)
+            drivers_df.to_csv(os.path.join(data_dir, "drivers.csv"), index=False)
+            constructors_df.to_csv(os.path.join(data_dir, "constructors.csv"), index=False)
 
     print(f"\nCompletato. {len(new_races)} gare processate.")
 

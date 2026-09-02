@@ -16,24 +16,43 @@ BASE_URL = "https://api.jolpi.ca/ergast/f1"
 REQUEST_DELAY_SECONDS = 0.3
 
 
-def _get(endpoint):
+def _get(endpoint, max_retries=3):
     """
     Esegue una richiesta GET verso l'API e ritorna il JSON parsato.
     Centralizza la pausa di rate-limiting: qualsiasi funzione di questo modulo che chiama _get eredita automaticamente il rispetto dei limiti
 
     Parametri:
         endpoint: percorso relativo a BASE_URL
+        max_retries: numero di tentativi prima di sollevare l'errore
 
     Ritorna:
         dizionario con il JSON deserializzato della risposta
 
     Solleva:
-        requests.HTTPError se la richiesta fallisce, propagato esplicitamente invece di essere silenziato
+        requests.RequestException se tutti i tentativi falliscono
     """
-    response = requests.get(f"{BASE_URL}/{endpoint}")
-    response.raise_for_status()
-    time.sleep(REQUEST_DELAY_SECONDS)
-    return response.json()
+    if max_retries < 1:
+        raise ValueError("max_retries must be at least 1")
+
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(f"{BASE_URL}/{endpoint}", timeout=15)
+            response.raise_for_status()
+            time.sleep(REQUEST_DELAY_SECONDS)
+            return response.json()
+        except requests.RequestException as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait = 2 ** attempt  # backoff esponenziale: 1s, 2s, 4s
+                print(f"    Errore di rete ({e.__class__.__name__}), ritento tra {wait}s...")
+                time.sleep(wait)
+
+    if last_error is not None:
+        raise last_error
+
+    raise RuntimeError(f"Richiesta fallita senza eccezione catturata per endpoint: {endpoint}")
 
 
 def get_next_race_info():
@@ -121,6 +140,7 @@ def get_race_results(season, round_number):
     Ritorna:
         Lista di dict con driver_ref, constructor_ref, grid, position_order, points, finished. 
         Lista vuota se la gara non è ancora stata disputata.
+        Include anche driver_forename/driver_surname, utili per creare righe complete quando un pilota non è ancora nel dataset locale
 
     Nota su 'finished': positionText nell'API Jolpica è un numero (posizione) se il pilota ha classificato, oppure un codice
     ("R"=ritirato, "D"=squalificato, "E"=escluso, "W"=ritirato prima del via, "F"=non qualificato, "N"=non partito) se non l'ha fatto.
@@ -137,9 +157,12 @@ def get_race_results(season, round_number):
     return [
         {
             "driver_ref": entry["Driver"]["driverId"],
+            "driver_forename": entry["Driver"]["givenName"],
+            "driver_surname": entry["Driver"]["familyName"],
             "constructor_ref": entry["Constructor"]["constructorId"],
+            "constructor_name": entry["Constructor"]["name"],
             "grid": int(entry["grid"]),
-            "position_order": int(entry["position"]),  # <-- corretto: "position", non "positionOrder"
+            "position_order": int(entry["position"]),
             "points": float(entry["points"]),
             "finished": entry["positionText"] not in non_finish_codes,
         }
