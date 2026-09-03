@@ -19,6 +19,13 @@ FEATURE_COL = [
     "constructor_reliability",
     "driver_circuit_avg_position",
     "no_circuit_history",
+    "circuit_avg_speed_history",
+    "circuit_overtaking_index",
+    "circuit_length_km",
+    "circuit_num_corners",
+    "circuit_altitude_m",
+    "circuit_downforce_medium",
+    "circuit_downforce_high",
 ]
 # Iperparametri del modello campione, trovati con RandomizedSearchCV +TimeSeriesSplit (vedi notebooks/04_hyperparameter_tuning.ipynb)
 XGB_CHAMPION_PARAMS = {

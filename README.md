@@ -74,6 +74,33 @@ Dettaglio completo in `notebooks/04_hyperparameter_tuning.ipynb`.
 
 Il pattern generale conferma quanto visto con Random Forest: griglia e forma recente del pilota dominano nettamente, mentre storico circuito e affidabilità scuderia aggiungono poco. XGBoost tunato si affida ancora più fortemente alla griglia, coerente con la sua calibrazione verso la precision: il segnale più diretto e meno rumoroso riduce il rischio di falsi allarmi.
 
+## Feature dei circuiti
+
+Oltre alle feature su piloti e scuderie, il modello include caratteristiche del circuito stesso — l'idea è che alcune auto/team performino sistematicamente meglio su certi tipi di tracciato (alta velocità vs tecnico, tanti sorpassi vs pochi).
+
+**Caratteristiche statiche** (`circuit_length_km`, `circuit_num_corners`, `circuit_altitude_m`, `circuit_downforce_medium/high`) — da `data/reference/circuit_characteristics.csv`, compilata con l'aiuto di un LLM, poi ridotta alle sole colonne con buona coerenza tra fonti multiple. Dettaglio della metodologia e del prompt usato in `docs/circuit_data_prompt.md`.
+
+**Caratteristiche calcolate dallo storico** (`circuit_avg_speed_history`, `circuit_overtaking_index`) — velocità media storica e un indice di "sorpassabilità" (quanto cambiano le posizioni tra griglia e arrivo), calcolati direttamente dai dati delle gare passate su quel circuito, con la stessa logica anti-leakage delle altre feature temporali (solo gare precedenti). Preferiti a valori stimati esternamente perché sono dati reali, non approssimazioni.
+
+## Caratteristiche dei circuiti
+
+Il modello usa caratteristiche fisiche dei circuiti (lunghezza, numero curve, direzione, altitudine, carico aerodinamico) da `data/reference/circuit_characteristics.csv`, incluso nel repository (a differenza dei dati Kaggle, è dato compilato da questo progetto, quindi versionabile).
+
+**Metodologia**: dati raccolti tramite un LLM con istruzione esplicita di dichiarare "N/D" per valori non verificabili invece di stimarli — poi ridotti alle sole colonne con buona coerenza tra fonti multiple (lunghezza, curve, direzione, altitudine sono fatti quasi-oggettivi; il livello di carico aerodinamico è un giudizio qualitativo dichiarato come tale). Colonne meno affidabili nella prima raccolta (numero rettilinei, velocità media dichiarata, larghezza pista) sono state scartate e sostituite con equivalenti calcolati direttamente dallo storico gare (`circuit_avg_speed_history`, `circuit_overtaking_index` in `src/features.py`) — dati reali, non stimati, con la stessa logica anti-leakage temporale usata per le altre feature.
+
+**Per aggiornare o estendere la tabella** (es. nuovo circuito in calendario): il prompt usato per la raccolta iniziale è in `docs/circuit_data_prompt.md`. Dopo qualsiasi aggiunta, verifica la copertura con:
+```bash
+python3 -c "
+import pandas as pd
+circuits = pd.read_csv('data/raw/circuits.csv')
+races = pd.read_csv('data/raw/races.csv')
+characteristics = pd.read_csv('data/reference/circuit_characteristics.csv')
+used_refs = set(circuits[circuits['circuitId'].isin(races[races['year']>=2004]['circuitId'].unique())]['circuitRef'])
+missing = used_refs - set(characteristics['circuit_ref'])
+print(f'Circuiti mancanti: {missing or \"nessuno\"}')
+"
+```
+
 ## Aggiornamento dati live (Jolpica-F1)
 
 Il dataset storico Kaggle si fermava al 2024. `src/jolpica_client.py` fornisce un client per l'API [Jolpica-F1](https://github.com/jolpica/jolpica-f1), usato da `scripts/update_data.py` per integrare le stagioni 2025 e parte del 2026 (fino al 23 agosto 2026) nello storico locale, con mappatura automatica tra gli ID testuali di Jolpica (`driverRef`, `constructorRef`, `circuitRef`) e gli ID numerici del dataset Kaggle, creando nuovi ID per piloti/costruttori non presenti nel dump originale
@@ -127,4 +154,5 @@ Carica i dati, costruisce le feature, allena il modello campione (XGBoost tunato
 - [x] Hyperparameter tuning con validazione temporale
 - [x] Codice trasferito in `src/` (moduli riutilizzabili e testabili)
 - [x] Backfill storico 2025-2026 via Jolpica-F1
+- [x] Feature aggiuntive sulle caratteristiche dei circuiti (statiche + calcolate dallo storico)
 - [ ] Generazione previsioni sulla prossima gara (Gran Premio d'Italia, 6 settembre 2026)
