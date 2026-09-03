@@ -38,7 +38,7 @@ df = build_working_dataset(data["races"], data["results"], min_year=2004)
 print(f"   Righe: {df.shape[0]}")
 
 print("3. Feature engineering...")
-df = build_all_features(df, n_races=10)
+df = build_all_features(df, data["circuits"], n_races=10)
 print(f"   Righe dopo pulizia NaN: {df.shape[0]}")
 
 print("4. Split temporale train/test (train < 2025, test 2025-2026)...")

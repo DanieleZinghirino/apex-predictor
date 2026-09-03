@@ -41,25 +41,65 @@ def map_refs_to_ids(qualifying_results, drivers_df, constructors_df):
     return df.dropna(subset=["driverId", "constructorId"])
 
 
-def compute_driver_form(driver_id, historical_df, n_races=N_RACES_FORM):
+def compute_circuit_features(circuit_id, historical_df, circuits_df, characteristics_path=None):
     """
-    Media punti e posizione finale del pilota nelle ultime n_races gare disputate
+    Calcola le feature del circuito per una gara futura, con la stessa logica di src/features.py
 
     Parametri:
-        driver_id: ID interno del pilota
-        historical_df: DataFrame storico (output di build_working_dataset)
-        n_races: quante gare recenti considerare
+        circuit_id: ID interno del circuito
+        historical_df: DataFrame storico (grezzo, prima delle feature)
+        circuits_df: DataFrame circuits.csv
+        characteristics_path: percorso circuit_characteristics.csv; None usa il default in data/reference/
 
     Ritorna:
-        tupla (points_avg, position_avg). Se il pilota non ha storico ritorna (None, None)
+        dict con tutte le feature circuit_* attese dal modello
     """
-    driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
+    import os
+    import pandas as pd
+    from src.data_loading import PROJECT_ROOT
 
-    if driver_races.empty:
-        return None, None
+    if characteristics_path is None:
+        characteristics_path = os.path.join(PROJECT_ROOT, "data", "reference", "circuit_characteristics.csv")
 
-    recent = driver_races.tail(n_races)
-    return recent["points"].mean(), recent["positionOrder"].mean()
+    characteristics = pd.read_csv(characteristics_path)
+    ref_to_id = dict(zip(circuits_df["circuitRef"], circuits_df["circuitId"]))
+    characteristics["circuitId"] = characteristics["circuit_ref"].map(ref_to_id)
+
+    static_row = characteristics[characteristics["circuitId"] == circuit_id]
+
+    if static_row.empty:
+        # Circuito non nella tabella di riferimento: fallback ai valori medi, stesso principio del flag no_circuit_history
+        static = {
+            "circuit_length_km": characteristics["length_km"].mean(),
+            "circuit_num_corners": characteristics["num_corners"].mean(),
+            "circuit_altitude_m": characteristics["altitude_m"].mean(),
+            "circuit_downforce_medium": 0,
+            "circuit_downforce_high": 0,
+        }
+    else:
+        row = static_row.iloc[0]
+        static = {
+            "circuit_length_km": row["length_km"],
+            "circuit_num_corners": row["num_corners"],
+            "circuit_altitude_m": row["altitude_m"],
+            "circuit_downforce_medium": int(row["downforce_level"] == "medium"),
+            "circuit_downforce_high": int(row["downforce_level"] == "high"),
+        }
+
+    # Storico: tutte le gare passate su quel circuito, nessuno shift necessario
+    circuit_races = historical_df[historical_df["circuitId"] == circuit_id]
+
+    if circuit_races.empty:
+        avg_speed = historical_df["fastestLapSpeed"].mean()  # fallback globale
+        overtaking = (historical_df["grid"] - historical_df["positionOrder"]).abs().mean()
+    else:
+        avg_speed = circuit_races["fastestLapSpeed"].mean()
+        overtaking = (circuit_races["grid"] - circuit_races["positionOrder"]).abs().mean()
+
+    static["circuit_avg_speed_history"] = avg_speed
+    static["circuit_overtaking_index"] = overtaking
+
+    return static
 
 
 def compute_constructor_reliability(constructor_id, historical_df, n_races=N_RACES_RELIABILITY):
@@ -97,19 +137,23 @@ def compute_circuit_history(driver_id, circuit_id, historical_df):
     return races_here["positionOrder"].mean(), 0
 
 
-def build_upcoming_race_features(qualifying_df, historical_df, circuit_id):
+def build_upcoming_race_features(qualifying_df, historical_df, circuit_id, circuits_df):
     """
     Costruisce il DataFrame di feature per una gara futura, pronto per essere passato al modello
 
     Parametri:
-        qualifying_df: output di map_refs_to_ids() — driverId,constructorId, grid già mappati
+        qualifying_df: output di map_refs_to_ids() — driverId, constructorId, grid già mappati
         historical_df: DataFrame storico
         circuit_id: ID interno del circuito della gara da prevedere
+        circuits_df: DataFrame circuits.csv, necessario per le feature del circuito
 
     Ritorna:
         DataFrame con tutte le FEATURE_COL pronte per src.predict.predict_podium,
         più driverId/constructorId per identificare ciascuna riga
     """
+    # Le feature del circuito sono le stesse per tutti i piloti di questa gara (è lo stesso circuito)
+    circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
+
     rows = []
 
     for _, r in qualifying_df.iterrows():
@@ -126,7 +170,7 @@ def build_upcoming_race_features(qualifying_df, historical_df, circuit_id):
         if circuit_avg is None:
             circuit_avg = position_avg
 
-        rows.append({
+        row = {
             "driverId": r["driverId"],
             "constructorId": r["constructorId"],
             "grid": r["grid"],
@@ -135,10 +179,32 @@ def build_upcoming_race_features(qualifying_df, historical_df, circuit_id):
             "constructor_reliability": reliability if reliability is not None else 1.0,
             "driver_circuit_avg_position": circuit_avg,
             "no_circuit_history": no_history,
-        })
+        }
+        row.update(circuit_features)  # aggiunge tutte le circuit_* alla riga
+        rows.append(row)
 
     return pd.DataFrame(rows)
 
+def compute_driver_form(driver_id, historical_df, n_races=N_RACES_FORM):
+    """
+    Media punti e posizione finale del pilota nelle ultime n_races gare disputate
+
+    Parametri:
+        driver_id: ID interno del pilota
+        historical_df: DataFrame storico (output di build_working_dataset)
+        n_races: quante gare recenti considerare
+
+    Ritorna:
+        tupla (points_avg, position_avg). Se il pilota non ha storico
+        (debuttante assoluto), ritorna (None, None)
+    """
+    driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
+
+    if driver_races.empty:
+        return None, None
+
+    recent = driver_races.tail(n_races)
+    return recent["points"].mean(), recent["positionOrder"].mean()
 
 def compute_driver_recent_grid_avg(driver_id, historical_df, n_races=5):
     """
@@ -183,20 +249,23 @@ def get_current_roster(historical_df, season):
     return roster.drop_duplicates()
 
 
-def build_pre_qualifying_features(historical_df, circuit_id, season):
+def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df):
     """
-    Costruisce feature per una previsione anticipata, prima che le qualifiche reali siano disponibili 
+    Costruisce feature per una previsione anticipata, prima che le qualifiche reali siano disponibili
     Usa la griglia stimata (media recente) invece di quella reale, e la formazione piloti dell'ultima gara disputata come proxy degli iscritti.
 
     Parametri:
         historical_df: DataFrame storico
         circuit_id: ID interno del circuito della prossima gara
         season: anno della stagione corrente
+        circuits_df: DataFrame circuits.csv, necessario per le feature del circuito
 
     Ritorna:
-        DataFrame con le FEATURE_COLS, più una colonna
+        DataFrame con le FEATURE_COL, più una colonna
         'is_estimated_grid' per marcare esplicitamente la stima
     """
+    circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
+
     roster = get_current_roster(historical_df, season)
     rows = []
 
@@ -212,7 +281,7 @@ def build_pre_qualifying_features(historical_df, circuit_id, season):
         if circuit_avg is None:
             circuit_avg = position_avg
 
-        rows.append({
+        row = {
             "driverId": r["driverId"],
             "constructorId": r["constructorId"],
             "grid": estimated_grid,
@@ -222,6 +291,8 @@ def build_pre_qualifying_features(historical_df, circuit_id, season):
             "driver_circuit_avg_position": circuit_avg,
             "no_circuit_history": no_history,
             "is_estimated_grid": 1,
-        })
+        }
+        row.update(circuit_features)
+        rows.append(row)
 
     return pd.DataFrame(rows)

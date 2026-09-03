@@ -33,16 +33,15 @@ if circuit_id is None:
     sys.exit(1)
 
 if qualifying:
-    print("Griglia di qualifica reale disponibile — previsione DEFINITIVA.")
+    print("Griglia di qualifica reale disponibile; previsione:")
     qualifying_df = map_refs_to_ids(qualifying, data["drivers"], data["constructors"])
-    features_df = build_upcoming_race_features(qualifying_df, historical_df, circuit_id)
+    features_df = build_upcoming_race_features(qualifying_df, historical_df, circuit_id, data["circuits"])
     features_df["is_estimated_grid"] = 0
 else:
-    print("Qualifiche non ancora disponibili — genero una previsione ANTICIPATA")
-    print("con griglia STIMATA (media recente). Meno affidabile, da ricontrollare")
-    print("dopo le qualifiche reali.\n")
+    print("Qualifiche non ancora disponibili; previsione:")
     from src.live_predict import build_pre_qualifying_features
-    features_df = build_pre_qualifying_features(historical_df, circuit_id, int(race_info["season"]))
+    features_df = build_pre_qualifying_features(historical_df, circuit_id, int(race_info["season"]), data["circuits"])
+
 
 print("Caricamento modello e generazione previsioni...")
 model, threshold = load_trained_model()

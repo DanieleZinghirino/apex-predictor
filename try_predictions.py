@@ -9,7 +9,7 @@ from src.predict import load_trained_model, predict_podium
 print("Caricamento dati e ricostruzione feature...")
 data = load_raw_data()
 df = build_working_dataset(data["races"], data["results"], min_year=2004)
-df = build_all_features(df,10)
+df = build_all_features(df, data["circuits"], n_races=10)
 
 print("Caricamento modello addestrato...")
 model, threshold = load_trained_model()
