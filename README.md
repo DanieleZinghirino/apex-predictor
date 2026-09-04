@@ -64,7 +64,7 @@ Carica i dati, costruisce le feature (piloti, scuderie, circuiti), allena XGBoos
 python3 scripts/predict_next_race.py
 ```
 
-Recupera automaticamente la prossima gara in calendario. Se la griglia di qualifica ufficiale è già disponibile, genera una previsione **DEFINITIVA**; altrimenti genera una previsione **ANTICIPATA**, con griglia stimata dalla forma recente dei piloti — sempre etichettata chiaramente come tale.
+Recupera automaticamente la prossima gara in calendario. Se la griglia di qualifica ufficiale è già disponibile, genera una previsione **DEFINITIVA**; altrimenti genera una previsione **ANTICIPATA**, con griglia stimata dalla forma recente dei piloti, sempre etichettata chiaramente come tale.
 
 ### (Opzionale) Prova il modello su una gara già disputata
 
@@ -72,7 +72,7 @@ Recupera automaticamente la prossima gara in calendario. Se la griglia di qualif
 python3 try_predictions.py
 ```
 
-Utile per verificare rapidamente il comportamento del modello senza aspettare una gara futura — confronta la previsione con il risultato reale già noto.
+Utile per verificare rapidamente il comportamento del modello senza aspettare una gara futura, confronta la previsione con il risultato reale già noto.
 
 ## Struttura del progetto
 
@@ -103,15 +103,15 @@ apex-predictor/
 
 ## Metodologia e decisioni chiave
 
-**Range dati storici: 2004-2024** (poi esteso a 2025-2026 via API). Il tracciamento del giro veloce, introdotto nel 2004, si è rivelato fortemente predittivo del podio — motivo per cui il periodo precedente (2000-2003) è stato escluso a favore di un dataset completo su tutte le feature.
+**Range dati storici: 2004-2024** (poi esteso a 2025-2026 via API). Il tracciamento del giro veloce, introdotto nel 2004, si è rivelato fortemente predittivo del podio, motivo per cui il periodo precedente (2000-2003) è stato escluso a favore di un dataset completo su tutte le feature.
 
 **Target basato su `positionOrder`, non `position`**, perché quest'ultima è NaN per i ritiri, perdendo proprio i casi più utili da classificare come "non podio".
 
-**Feature engineering senza data leakage**: ogni feature (forma pilota, affidabilità scuderia, storico circuito) usa esclusivamente gare precedenti a quella prevista — verificato manualmente su singoli piloti prima di essere esteso a tutto il dataset. Per le gare future (dove non serve alcuno shift, dato che la gara non è nello storico), `src/live_predict.py` replica la stessa logica in una forma adattata.
+**Feature engineering senza data leakage**: ogni feature (forma pilota, affidabilità scuderia, storico circuito) usa esclusivamente gare precedenti a quella prevista, verificato manualmente su singoli piloti prima di essere esteso a tutto il dataset. Per le gare future (dove non serve alcuno shift, dato che la gara non è nello storico), `src/live_predict.py` replica la stessa logica in una forma adattata.
 
-**Selezione del modello**: confrontati 8 algoritmi di classificazione, poi ottimizzati i due migliori (Random Forest, XGBoost) con `RandomizedSearchCV` + `TimeSeriesSplit` (validazione che rispetta l'ordine cronologico). XGBoost tunato è il modello finale, scelto per **precision alta** — il progetto genera previsioni pubbliche, dove un falso allarme è visibile e costa credibilità più di un podio mancato.
+**Selezione del modello**: confrontati 8 algoritmi di classificazione, poi ottimizzati i due migliori (Random Forest, XGBoost) con `RandomizedSearchCV` + `TimeSeriesSplit` (validazione che rispetta l'ordine cronologico). XGBoost tunato è il modello finale, scelto per **precision alta**, il progetto genera previsioni pubbliche, dove un falso allarme è visibile e costa credibilità più di un podio mancato.
 
-**Feature sui circuiti**: caratteristiche fisiche (lunghezza, curve, direzione, altitudine, carico aerodinamico) da una tabella compilata con l'aiuto di un LLM, ridotta alle sole colonne con buona coerenza tra fonti multiple — le colonne più variabili sono state sostituite con equivalenti calcolati direttamente dallo storico gare (velocità media, indice di sorpassabilità), dati reali invece di stime esterne. Dettaglio completo in `docs/circuit_data_prompt.md`.
+**Feature sui circuiti**: caratteristiche fisiche (lunghezza, curve, direzione, altitudine, carico aerodinamico) da una tabella compilata con l'aiuto di un LLM, ridotta alle sole colonne con buona coerenza tra fonti multiple, le colonne più variabili sono state sostituite con equivalenti calcolati direttamente dallo storico gare (velocità media, indice di sorpassabilità), dati reali invece di stime esterne. Dettaglio completo in `docs/circuit_data_prompt.md`.
 
 Dettaglio completo del ragionamento in `notebooks/01_eda.ipynb` → `04_hyperparameter_tuning.ipynb`, in ordine.
 
@@ -138,15 +138,28 @@ Ogni cambiamento è stato misurato isolatamente, per capire quale contributo des
 | + backfill storico 2025-2026 | 0.629 | 0.833 | 0.717 | Stesso modello/feature, più dati storici reali |
 | + feature sui circuiti | 0.650 | 0.824 | 0.727 | +6 feature (statiche + calcolate dallo storico) |
 
-Il salto maggiore (+0.035 F1) viene dall'aver esteso lo storico con dati reali (2025-2026), non dalle feature sui circuiti (+0.010 F1) — coerente con la feature importance, dove griglia e forma recente del pilota pesano insieme circa il 70%, contro il ~13% delle feature circuito. Un guadagno più piccolo ma comunque nella direzione giusta per l'obiettivo del progetto: precision più alta (+2 punti) a fronte di una recall quasi invariata.
+Il salto maggiore (+0.035 F1) viene dall'aver esteso lo storico con dati reali (2025-2026), non dalle feature sui circuiti (+0.010 F1), coerente con la feature importance, dove griglia e forma recente del pilota pesano insieme circa il 70%, contro il ~13% delle feature circuito. Un guadagno più piccolo ma comunque nella direzione giusta per l'obiettivo del progetto: precision più alta (+2 punti) a fronte di una recall quasi invariata.
+
+## Feature aggiuntive
+
+Oltre alle feature di piloti/scuderie/circuiti, sono state aggiunte:
+
+- **Gara di casa** (pilota/scuderia), confronto tra nazionalità e paese del circuito
+- **Posizione in classifica generale** (pilota/costruttore) al momento della gara, presa dalla gara PRECEDENTE nello stesso anno, per evitare leakage (driver_standings.csv riflette la classifica dopo ogni gara, non prima)
+- **Confronto col compagno di squadra**, gap nella forma recente rispetto al compagno, isola l'abilità del pilota dalla qualità della macchina
+- **Distacco in qualifica dal poleman**, in secondi, calcolato dal miglior tempo tra Q1/Q2/Q3
+- **Meteo** (temperatura massima, precipitazioni), da Open-Meteo (API storica gratuita), tramite `scripts/fetch_weather.py`, salvato in `data/reference/race_weather.csv`
+
+## Stato del progetto
+
+🚧 In sviluppo, Set di feature esteso (circuiti, standings, compagno di squadra, qualifica, meteo) integrato e testato nella pipeline di training. **Nota**: `src/live_predict.py` (previsione sulla prossima gara) non è ancora aggiornato con queste 5 nuove feature, `scripts/predict_next_race.py` richiede questo aggiornamento prima di tornare a funzionare correttamente.
 
 ## Roadmap
 
 - [x] Setup ambiente e struttura progetto
-- [x] Analisi esplorativa dei dati
-- [x] Feature engineering senza data leakage (piloti, scuderie, circuiti)
-- [x] Confronto sistematico tra 8 algoritmi di classificazione
-- [x] Hyperparameter tuning con validazione temporale
-- [x] Backfill storico 2025-2026 via Jolpica-F1
-- [x] Pipeline di previsione sulla prossima gara (con fallback su griglia stimata)
-- [ ] API/demo per rendere le previsioni consultabili senza terminale
+- [x] Analisi esplorativa, feature engineering base, confronto modelli, tuning
+- [x] Backfill storico 2025-2026 via Jolpica-F1 (risultati + qualifiche)
+- [x] Feature sui circuiti (statiche + calcolate)
+- [x] Feature aggiuntive: gara di casa, standings, compagno di squadra, qualifica, meteo
+- [ ] Aggiornare `src/live_predict.py` con le 5 nuove feature (necessario per far tornare a funzionare le previsioni live)
+- [ ] Tappa 3: servire il modello via API + demo
