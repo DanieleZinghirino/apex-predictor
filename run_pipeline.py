@@ -6,6 +6,10 @@ Modello scelto per priorità a precision alta (soglia 0.75).
 Vedi README e notebooks/03_model_comparison.ipynb, notebooks/04_hyperparameter_tuning.ipynb per il ragionamento completo.
 """
 from xgboost import XGBClassifier
+import pandas as pd
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 from src.data_loading import load_raw_data, build_working_dataset
 from src.features import build_all_features
@@ -38,7 +42,13 @@ df = build_working_dataset(data["races"], data["results"], min_year=2004)
 print(f"   Righe: {df.shape[0]}")
 
 print("3. Feature engineering...")
-df = build_all_features(df, data["circuits"], n_races=10)
+df = build_all_features(
+    df, data["circuits"], data["drivers"], data["constructors"],
+    data["driver_standings"], data["constructor_standings"],
+    pd.read_csv(os.path.join(PROJECT_ROOT, "data", "raw", "qualifying.csv")),
+    n_races=10
+)
+
 print(f"   Righe dopo pulizia NaN: {df.shape[0]}")
 
 print("4. Split temporale train/test (train < 2025, test 2025-2026)...")

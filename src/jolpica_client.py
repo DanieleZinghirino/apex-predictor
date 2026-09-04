@@ -110,7 +110,7 @@ def get_qualifying_results(season, round_number):
         round_number: numero del round nella stagione
 
     Ritorna:
-        Lista di dict con driver_ref, constructor_ref, grid_position ordinata per posizione in griglia. 
+        Lista di dict con driver_ref, constructor_ref, grid_position ordinata per posizione in griglia, q1, q2, q3
         Lista vuota se le qualifiche non sono ancora state disputate
     """
     data = _get(f"{season}/{round_number}/qualifying/")
@@ -124,6 +124,9 @@ def get_qualifying_results(season, round_number):
             "driver_ref": entry["Driver"]["driverId"],
             "constructor_ref": entry["Constructor"]["constructorId"],
             "grid_position": int(entry["position"]),
+            "q1": entry.get("Q1"),
+            "q2": entry.get("Q2"),
+            "q3": entry.get("Q3"),
         }
         for entry in races[0]["QualifyingResults"]
     ]

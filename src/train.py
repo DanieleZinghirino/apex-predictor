@@ -13,19 +13,16 @@ os.makedirs("../models", exist_ok=True)
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURE_COL = [
-    "grid",
-    "driver_recent_points_avg",
-    "driver_recent_position_avg",
-    "constructor_reliability",
-    "driver_circuit_avg_position",
-    "no_circuit_history",
-    "circuit_avg_speed_history",
-    "circuit_overtaking_index",
-    "circuit_length_km",
-    "circuit_num_corners",
-    "circuit_altitude_m",
-    "circuit_downforce_medium",
-    "circuit_downforce_high",
+    "grid", "driver_recent_points_avg", "driver_recent_position_avg",
+    "constructor_reliability", "driver_circuit_avg_position", "no_circuit_history",
+    "circuit_avg_speed_history", "circuit_overtaking_index",
+    "circuit_length_km", "circuit_num_corners", "circuit_altitude_m",
+    "circuit_downforce_medium", "circuit_downforce_high",
+    "driver_home_race", "constructor_home_race",
+    "driver_standing_position", "constructor_standing_position",
+    "teammate_position_gap",
+    "qualifying_gap_seconds",
+    "race_max_temp_c", "race_precipitation_mm", "race_is_wet",
 ]
 # Iperparametri del modello campione, trovati con RandomizedSearchCV +TimeSeriesSplit (vedi notebooks/04_hyperparameter_tuning.ipynb)
 XGB_CHAMPION_PARAMS = {

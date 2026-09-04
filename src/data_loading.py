@@ -25,6 +25,8 @@ def load_raw_data(data_dir=None):
     drivers = pd.read_csv(f"{data_dir}/drivers.csv", na_values=NA_VALUES)
     constructors = pd.read_csv(f"{data_dir}/constructors.csv", na_values=NA_VALUES)
     circuits = pd.read_csv(f"{data_dir}/circuits.csv", na_values=NA_VALUES)
+    driver_standings = pd.read_csv(f"{data_dir}/driver_standings.csv", na_values=NA_VALUES)
+    constructor_standings = pd.read_csv(f"{data_dir}/constructor_standings.csv", na_values=NA_VALUES)
 
     return {
         "races": races,
@@ -32,6 +34,8 @@ def load_raw_data(data_dir=None):
         "drivers": drivers,
         "constructors": constructors,
         "circuits": circuits,
+        "driver_standings": driver_standings,
+        "constructor_standings": constructor_standings,
     }
 
 def build_working_dataset(races, results, min_year=2004):

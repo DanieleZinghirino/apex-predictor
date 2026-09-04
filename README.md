@@ -128,6 +128,18 @@ Validato su gare mai viste in training (2025 e parte del 2026):
 
 **Feature più importanti**: posizione in griglia (43%) e forma recente del pilota (28% in blocco) dominano; le feature sui circuiti (statiche + calcolate) contribuiscono complessivamente circa il 13%, non marginale ma neanche decisivo.
 
+### Evoluzione del modello
+
+Ogni cambiamento è stato misurato isolatamente, per capire quale contributo desse davvero:
+
+| Fase | Precision | Recall | F1 | Cosa è cambiato |
+|---|---|---|---|---|
+| XGBoost tunato, test 2023-2024 | 0.628 | 0.746 | 0.682 | Modello base, prima del backfill |
+| + backfill storico 2025-2026 | 0.629 | 0.833 | 0.717 | Stesso modello/feature, più dati storici reali |
+| + feature sui circuiti | 0.650 | 0.824 | 0.727 | +6 feature (statiche + calcolate dallo storico) |
+
+Il salto maggiore (+0.035 F1) viene dall'aver esteso lo storico con dati reali (2025-2026), non dalle feature sui circuiti (+0.010 F1) — coerente con la feature importance, dove griglia e forma recente del pilota pesano insieme circa il 70%, contro il ~13% delle feature circuito. Un guadagno più piccolo ma comunque nella direzione giusta per l'obiettivo del progetto: precision più alta (+2 punti) a fronte di una recall quasi invariata.
+
 ## Roadmap
 
 - [x] Setup ambiente e struttura progetto

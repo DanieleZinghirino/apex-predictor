@@ -203,6 +203,55 @@ def build_new_rows(race, results, driver_map, constructor_map, circuit_map,
 
     return drivers_df, constructors_df, races_df, results_df, new_race_id
 
+def build_qualifying_rows(race, driver_map, constructor_map, new_race_id, qualifying_df):
+    """
+    Converte i dati di qualifica di una gara (da Jolpica) nel formato di qualifying.csv, usando le mappe driver/constructor già risolte
+
+    Parametri:
+        race: dict con season, round (per la chiamata API)
+        driver_map, constructor_map: mappe ref->id, già aggiornate
+        new_race_id: raceId assegnato a questa gara in races.csv
+        qualifying_df: DataFrame qualifying.csv corrente, a cui vengono aggiunte le nuove righe
+
+    Ritorna:
+        qualifying_df aggiornato
+    """
+    from src.jolpica_client import get_qualifying_results
+
+    qualifying_results = get_qualifying_results(race["season"], race["round"])
+
+    if not qualifying_results:
+        print("  Nessun dato di qualifica disponibile, salto.")
+        return qualifying_df
+
+    new_qualify_id = int(qualifying_df["qualifyId"].max()) + 1 if not qualifying_df.empty else 1
+
+    for q in qualifying_results:
+        driver_id = driver_map.get(q["driver_ref"])
+        constructor_id = constructor_map.get(q["constructor_ref"])
+
+        if driver_id is None or constructor_id is None:
+            # Non dovrebbe succedere se questa funzione gira dopo
+            # build_new_rows, ma meglio segnalarlo esplicitamente
+            # che fallire silenziosamente
+            print(f"  ATTENZIONE: {q['driver_ref']} non mappato per le qualifiche, riga saltata")
+            continue
+
+        # Jolpica non fornisce i tempi Q1/Q2/Q3 separati nell'endpoint qualifying di base in modo affidabile per tutte le stagioni;
+        # usiamo la posizione come unico dato certo, lasciando i tempi vuoti e add_qualifying_gap li tratterà come mancanti, col fallback già previsto in 
+        # handle_missing_values
+        new_row = {
+            "qualifyId": new_qualify_id,
+            "raceId": new_race_id,
+            "driverId": driver_id,
+            "constructorId": constructor_id,
+            "position": q["grid_position"],
+        }
+        qualifying_df = pd.concat([qualifying_df, pd.DataFrame([new_row])], ignore_index=True)
+        new_qualify_id += 1
+
+    return qualifying_df
+
 
 def main():
     print("Caricamento dati locali...")
@@ -234,6 +283,8 @@ def main():
         if os.path.exists(src):
             pd.read_csv(src).to_csv(os.path.join(backup_dir, fname), index=False)
 
+    qualifying_df = pd.read_csv(os.path.join(data_dir, "qualifying.csv"))
+
     for race in new_races:
         print(f"\nScaricamento: {race['season']} round {race['round']} — {race['race_name']}")
         results = get_race_results(race["season"], race["round"])
@@ -250,9 +301,9 @@ def main():
         if new_id:
             print(f"  Aggiunta come raceId={new_id}, {len(results)} risultati")
 
-            # Salvataggio incrementale: dopo OGNI gara aggiunta con successo,
-            # non solo alla fine — così un crash a metà perde al massimo
-            # la gara in corso, non tutto il lavoro già fatto
+            # Salvataggio incrementale: dopo ogni gara aggiunta con successo, non solo alla fine
+            qualifying_df = build_qualifying_rows(race, driver_map, constructor_map, new_id, qualifying_df)
+            qualifying_df.to_csv(os.path.join(data_dir, "qualifying.csv"), index=False)
             races_df.to_csv(os.path.join(data_dir, "races.csv"), index=False)
             results_df.to_csv(os.path.join(data_dir, "results.csv"), index=False)
             drivers_df.to_csv(os.path.join(data_dir, "drivers.csv"), index=False)
