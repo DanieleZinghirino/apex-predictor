@@ -9,8 +9,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, precision_score, recall_score, f1_score
 from xgboost import XGBClassifier
 
-os.makedirs("../models", exist_ok=True)
-
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURE_COL = [
     "grid", "driver_recent_points_avg", "driver_recent_position_avg",
@@ -163,7 +161,7 @@ def evaluate_model(model, test_df, threshold=0.6):
     y_test = test_df["podium"]
 
     y_proba = model.predict_proba(X_test)[:,1]
-    y_pred = (y_proba > threshold).astype(int)
+    y_pred = (y_proba >= threshold).astype(int)
 
     return classification_report(y_test, y_pred, target_names=["Non podio", "Podio"])
 

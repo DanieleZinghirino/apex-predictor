@@ -7,7 +7,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 from src.data_loading import load_raw_data, build_working_dataset
 from src.jolpica_client import get_next_race_info, get_qualifying_results
-from src.live_predict import map_refs_to_ids, build_upcoming_race_features
+from src.live_predict import (
+    map_refs_to_ids,
+    build_upcoming_race_features,
+    build_pre_qualifying_features,
+    compute_live_qualifying_gaps,
+)
 from src.predict import load_trained_model, predict_podium
 
 print("Recupero informazioni sulla prossima gara...")
@@ -21,6 +26,8 @@ print(f"Prossima gara: {race_info['race_name']} ({race_info['date']})")
 
 print("Recupero griglia di partenza...")
 qualifying = get_qualifying_results(race_info["season"], race_info["round"])
+if qualifying:
+    qualifying = compute_live_qualifying_gaps(qualifying)
 
 data = load_raw_data()
 historical_df = build_working_dataset(data["races"], data["results"], min_year=2004)
@@ -33,15 +40,15 @@ if circuit_id is None:
     sys.exit(1)
 
 if qualifying:
-    print("Griglia di qualifica reale disponibile; previsione:")
     qualifying_df = map_refs_to_ids(qualifying, data["drivers"], data["constructors"])
-    features_df = build_upcoming_race_features(qualifying_df, historical_df, circuit_id, data["circuits"])
+    features_df = build_upcoming_race_features(
+        qualifying_df, historical_df, circuit_id, data["circuits"], race_date=race_info["date"]
+    )
     features_df["is_estimated_grid"] = 0
 else:
-    print("Qualifiche non ancora disponibili; previsione:")
-    from src.live_predict import build_pre_qualifying_features
-    features_df = build_pre_qualifying_features(historical_df, circuit_id, int(race_info["season"]), data["circuits"])
-
+    features_df = build_pre_qualifying_features(
+        historical_df, circuit_id, int(race_info["season"]), data["circuits"], race_date=race_info["date"]
+    )
 
 print("Caricamento modello e generazione previsioni...")
 model, threshold = load_trained_model()

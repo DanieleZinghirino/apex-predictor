@@ -13,10 +13,10 @@ def map_refs_to_ids(qualifying_results, drivers_df, constructors_df):
     
     Parametri:
         qualifying_results: lista di dizionari da get_qualifying_results()
-        drivers_df, constructors_df: DataFrame con le colonne driverRef o constructorRef (da liad_raw_data())
+        drivers_df, constructors_df: DataFrame con le colonne driverRef o constructorRef (da load_raw_data())
     
     Ritorna:
-        DataFrame con driverId, constructorId, grid_posizion e i ref originali
+        DataFrame con driverId, constructorId, grid e i ref originali
     """
     driver_map = dict(zip(drivers_df["driverRef"], drivers_df["driverId"]))
     constructor_map = dict(zip(constructors_df["constructorRef"], constructors_df["constructorId"]))
@@ -29,6 +29,7 @@ def map_refs_to_ids(qualifying_results, drivers_df, constructors_df):
             "driverId": driver_map.get(r["driver_ref"]),  # None se non mappabile
             "constructorId": constructor_map.get(r["constructor_ref"]),
             "grid": r["grid_position"],
+            "qualifying_gap_seconds": r.get("qualifying_gap_seconds", 0.0),
         })
 
     df = pd.DataFrame(rows)
@@ -44,15 +45,6 @@ def map_refs_to_ids(qualifying_results, drivers_df, constructors_df):
 def compute_circuit_features(circuit_id, historical_df, circuits_df, characteristics_path=None):
     """
     Calcola le feature del circuito per una gara futura, con la stessa logica di src/features.py
-
-    Parametri:
-        circuit_id: ID interno del circuito
-        historical_df: DataFrame storico (grezzo, prima delle feature)
-        circuits_df: DataFrame circuits.csv
-        characteristics_path: percorso circuit_characteristics.csv; None usa il default in data/reference/
-
-    Ritorna:
-        dict con tutte le feature circuit_* attese dal modello
     """
     import os
     import pandas as pd
@@ -68,7 +60,6 @@ def compute_circuit_features(circuit_id, historical_df, circuits_df, characteris
     static_row = characteristics[characteristics["circuitId"] == circuit_id]
 
     if static_row.empty:
-        # Circuito non nella tabella di riferimento: fallback ai valori medi, stesso principio del flag no_circuit_history
         static = {
             "circuit_length_km": characteristics["length_km"].mean(),
             "circuit_num_corners": characteristics["num_corners"].mean(),
@@ -86,11 +77,10 @@ def compute_circuit_features(circuit_id, historical_df, circuits_df, characteris
             "circuit_downforce_high": int(row["downforce_level"] == "high"),
         }
 
-    # Storico: tutte le gare passate su quel circuito, nessuno shift necessario
     circuit_races = historical_df[historical_df["circuitId"] == circuit_id]
 
     if circuit_races.empty:
-        avg_speed = historical_df["fastestLapSpeed"].mean()  # fallback globale
+        avg_speed = historical_df["fastestLapSpeed"].mean()
         overtaking = (historical_df["grid"] - historical_df["positionOrder"]).abs().mean()
     else:
         avg_speed = circuit_races["fastestLapSpeed"].mean()
@@ -103,12 +93,6 @@ def compute_circuit_features(circuit_id, historical_df, circuits_df, characteris
 
 
 def compute_constructor_reliability(constructor_id, historical_df, n_races=N_RACES_RELIABILITY):
-    """
-    Percentuale di gare completate dal costruttore nelle ultime n_races gare
-
-    Ritorna:
-        float tra 0 e 1, oppure None se nessuno storico disponibile
-    """
     constructor_races = historical_df[historical_df["constructorId"] == constructor_id].sort_values("date")
 
     if constructor_races.empty:
@@ -118,14 +102,8 @@ def compute_constructor_reliability(constructor_id, historical_df, n_races=N_RAC
     finished = recent["position"].notnull().astype(int)
     return finished.mean()
 
-def compute_circuit_history(driver_id, circuit_id, historical_df):
-    """
-    Media posizione finale del pilota su quel circuito specifico, su tutte le apparizioni storiche disponibili.
 
-    Ritorna:
-        tupla (avg_position, no_history_flag). avg_position è None
-        se il pilota non ha mai corso su quel circuito.
-    """
+def compute_circuit_history(driver_id, circuit_id, historical_df):
     races_here = historical_df[
         (historical_df["driverId"] == driver_id) &
         (historical_df["circuitId"] == circuit_id)
@@ -137,67 +115,7 @@ def compute_circuit_history(driver_id, circuit_id, historical_df):
     return races_here["positionOrder"].mean(), 0
 
 
-def build_upcoming_race_features(qualifying_df, historical_df, circuit_id, circuits_df):
-    """
-    Costruisce il DataFrame di feature per una gara futura, pronto per essere passato al modello
-
-    Parametri:
-        qualifying_df: output di map_refs_to_ids() — driverId, constructorId, grid già mappati
-        historical_df: DataFrame storico
-        circuit_id: ID interno del circuito della gara da prevedere
-        circuits_df: DataFrame circuits.csv, necessario per le feature del circuito
-
-    Ritorna:
-        DataFrame con tutte le FEATURE_COL pronte per src.predict.predict_podium,
-        più driverId/constructorId per identificare ciascuna riga
-    """
-    # Le feature del circuito sono le stesse per tutti i piloti di questa gara (è lo stesso circuito)
-    circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
-
-    rows = []
-
-    for _, r in qualifying_df.iterrows():
-        points_avg, position_avg = compute_driver_form(r["driverId"], historical_df)
-        reliability = compute_constructor_reliability(r["constructorId"], historical_df)
-        circuit_avg, no_history = compute_circuit_history(r["driverId"], circuit_id, historical_df)
-
-        # Se manca la forma generale del pilota non possiamo nemmeno applicare il fallback usato in src/features.py, segnaliamo e saltiamo invece di inventare un valore
-        if points_avg is None:
-            print(f"  ATTENZIONE: nessuno storico per driverId={r['driverId']}, escluso dalla previsione")
-            continue
-
-        # Fallback identico a quello usato in training: se manca lo storico specifico sul circuito, usa la forma generale
-        if circuit_avg is None:
-            circuit_avg = position_avg
-
-        row = {
-            "driverId": r["driverId"],
-            "constructorId": r["constructorId"],
-            "grid": r["grid"],
-            "driver_recent_points_avg": points_avg,
-            "driver_recent_position_avg": position_avg,
-            "constructor_reliability": reliability if reliability is not None else 1.0,
-            "driver_circuit_avg_position": circuit_avg,
-            "no_circuit_history": no_history,
-        }
-        row.update(circuit_features)  # aggiunge tutte le circuit_* alla riga
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
 def compute_driver_form(driver_id, historical_df, n_races=N_RACES_FORM):
-    """
-    Media punti e posizione finale del pilota nelle ultime n_races gare disputate
-
-    Parametri:
-        driver_id: ID interno del pilota
-        historical_df: DataFrame storico (output di build_working_dataset)
-        n_races: quante gare recenti considerare
-
-    Ritorna:
-        tupla (points_avg, position_avg). Se il pilota non ha storico
-        (debuttante assoluto), ritorna (None, None)
-    """
     driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
 
     if driver_races.empty:
@@ -206,19 +124,8 @@ def compute_driver_form(driver_id, historical_df, n_races=N_RACES_FORM):
     recent = driver_races.tail(n_races)
     return recent["points"].mean(), recent["positionOrder"].mean()
 
+
 def compute_driver_recent_grid_avg(driver_id, historical_df, n_races=5):
-    """
-    Media della posizione di griglia nelle ultime n_races gare del pilota, usata come STIMA della griglia quando le qualifiche reali non sono ancora disponibili. 
-    Meno affidabile della griglia vera
-
-    Parametri:
-        driver_id: ID interno del pilota
-        historical_df: DataFrame storico
-        n_races: quante gare recenti considerare
-
-    Ritorna:
-        float, oppure None se nessuno storico disponibile
-    """
     driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
 
     if driver_races.empty:
@@ -228,20 +135,12 @@ def compute_driver_recent_grid_avg(driver_id, historical_df, n_races=5):
 
 
 def get_current_roster(historical_df, season):
-    """
-    Ritorna la formazione piloti/costruttori dell'ultima gara disputata in una stagione
-
-    Parametri:
-        historical_df: DataFrame storico
-        season: anno della stagione corrente
-
-    Ritorna:
-        DataFrame con driverId, constructorId univoci
-    """
     season_races = historical_df[historical_df["year"] == season]
 
     if season_races.empty:
-        return pd.DataFrame(columns=["driverId", "constructorId"])
+        # Fallback all'ultima stagione disponibile nello storico
+        latest_season = historical_df["year"].max()
+        season_races = historical_df[historical_df["year"] == latest_season]
 
     last_race_id = season_races["raceId"].max()
     roster = season_races[season_races["raceId"] == last_race_id][["driverId", "constructorId"]]
@@ -249,23 +148,98 @@ def get_current_roster(historical_df, season):
     return roster.drop_duplicates()
 
 
-def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df):
+def _get_latest_standings(driver_id, constructor_id, historical_df):
+    """Estrae la posizione in classifica più recente per pilota e costruttore."""
+    driver_races = historical_df[historical_df["driverId"] == driver_id]
+    constructor_races = historical_df[historical_df["constructorId"] == constructor_id]
+
+    driver_pos = driver_races["driver_standing_position"].dropna().iloc[-1] if not driver_races.empty and "driver_standing_position" in driver_races.columns else 10
+    constructor_pos = constructor_races["constructor_standing_position"].dropna().iloc[-1] if not constructor_races.empty and "constructor_standing_position" in constructor_races.columns else 5
+
+    return driver_pos, constructor_pos
+
+
+def _enrich_missing_feature_columns(df):
     """
-    Costruisce feature per una previsione anticipata, prima che le qualifiche reali siano disponibili
-    Usa la griglia stimata (media recente) invece di quella reale, e la formazione piloti dell'ultima gara disputata come proxy degli iscritti.
+    Garantisce che tutte le feature richieste dal modello (FEATURE_COL) siano presenti con valori standard/fallback dove necessario
+    """
+    df = df.copy()
+    df["teammate_position_gap"] = df.groupby("constructorId")["grid"].transform(lambda x: x - x.mean()).fillna(0)
 
-    Parametri:
-        historical_df: DataFrame storico
-        circuit_id: ID interno del circuito della prossima gara
-        season: anno della stagione corrente
-        circuits_df: DataFrame circuits.csv, necessario per le feature del circuito
+    # Feature di qualifica e compagno di squadra
+    if "qualifying_gap_seconds" not in df.columns:
+        df["qualifying_gap_seconds"] = 0.0
 
-    Ritorna:
-        DataFrame con le FEATURE_COL, più una colonna
-        'is_estimated_grid' per marcare esplicitamente la stima
+    if "teammate_position_gap" not in df.columns:
+        team_avg = df.groupby("constructorId")["driver_recent_position_avg"].transform("mean")
+        team_count = df.groupby("constructorId")["driverId"].transform("count")
+        denom = (team_count - 1).replace(0, 1)  # evita divisione per zero se un pilota è solo in scuderia
+        teammate_avg = (team_avg * team_count - df["driver_recent_position_avg"]) / denom
+        df["teammate_position_gap"] = (teammate_avg - df["driver_recent_position_avg"]).fillna(0)
+
+    # Feature gara di casa (valori predefiniti a 0 se non calcolati esplicitamente)
+    if "driver_home_race" not in df.columns:
+        df["driver_home_race"] = 0
+    if "constructor_home_race" not in df.columns:
+        df["constructor_home_race"] = 0
+
+    # Feature meteo (valori predefiniti per gare standard)
+    df["race_max_temp_c"] = df["race_max_temp_c"].fillna(25.0) if "race_max_temp_c" in df.columns else 25.0
+    df["race_precipitation_mm"] = df["race_precipitation_mm"].fillna(0.0) if "race_precipitation_mm" in df.columns else 0.0
+    df["race_is_wet"] = df["race_is_wet"].fillna(0) if "race_is_wet" in df.columns else 0
+
+    return df
+
+
+def build_upcoming_race_features(qualifying_df, historical_df, circuit_id, circuits_df, race_date=None):
+    """
+    Costruisce il DataFrame di feature per una gara futura dopo le qualifiche
     """
     circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
+    weather_features = compute_live_weather(circuit_id, circuits_df, race_date) if race_date else {}
+    rows = []
 
+    for _, r in qualifying_df.iterrows():
+        points_avg, position_avg = compute_driver_form(r["driverId"], historical_df)
+        reliability = compute_constructor_reliability(r["constructorId"], historical_df)
+        circuit_avg, no_history = compute_circuit_history(r["driverId"], circuit_id, historical_df)
+        driver_pos, constructor_pos = _get_latest_standings(r["driverId"], r["constructorId"], historical_df)
+
+        if points_avg is None:
+            print(f"  ATTENZIONE: nessuno storico per driverId={r['driverId']}, escluso dalla previsione")
+            continue
+
+        if circuit_avg is None:
+            circuit_avg = position_avg
+
+        row = {
+            "driverId": r["driverId"],
+            "constructorId": r["constructorId"],
+            "grid": r["grid"],
+            "qualifying_gap_seconds": r.get("qualifying_gap_seconds", 0.0),
+            "driver_recent_points_avg": points_avg,
+            "driver_recent_position_avg": position_avg,
+            "constructor_reliability": reliability if reliability is not None else 1.0,
+            "driver_circuit_avg_position": circuit_avg,
+            "no_circuit_history": no_history,
+            "driver_standing_position": driver_pos,
+            "constructor_standing_position": constructor_pos,
+        }
+        row.update(circuit_features)
+        row.update(weather_features)
+        rows.append(row)
+
+
+    df = pd.DataFrame(rows)
+    return _enrich_missing_feature_columns(df)
+
+
+def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df, race_date=None):
+    """
+    Costruisce feature per una previsione anticipata prima delle qualifiche
+    """
+    circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
+    weather_features = compute_live_weather(circuit_id, circuits_df, race_date) if race_date else {}
     roster = get_current_roster(historical_df, season)
     rows = []
 
@@ -274,6 +248,7 @@ def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df
         points_avg, position_avg = compute_driver_form(r["driverId"], historical_df)
         reliability = compute_constructor_reliability(r["constructorId"], historical_df)
         circuit_avg, no_history = compute_circuit_history(r["driverId"], circuit_id, historical_df)
+        driver_pos, constructor_pos = _get_latest_standings(r["driverId"], r["constructorId"], historical_df)
 
         if points_avg is None or estimated_grid is None:
             continue
@@ -285,14 +260,79 @@ def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df
             "driverId": r["driverId"],
             "constructorId": r["constructorId"],
             "grid": estimated_grid,
+            "qualifying_gap_seconds": 0.0,
             "driver_recent_points_avg": points_avg,
             "driver_recent_position_avg": position_avg,
             "constructor_reliability": reliability if reliability is not None else 1.0,
             "driver_circuit_avg_position": circuit_avg,
             "no_circuit_history": no_history,
+            "driver_standing_position": driver_pos,
+            "constructor_standing_position": constructor_pos,
             "is_estimated_grid": 1,
         }
         row.update(circuit_features)
+        row.update(weather_features)
         rows.append(row)
 
-    return pd.DataFrame(rows)
+    df = pd.DataFrame(rows)
+    return _enrich_missing_feature_columns(df)
+
+def compute_live_qualifying_gaps(qualifying_results):
+    """
+    Calcola il distacco dal poleman in secondi, dai tempi Q1/Q2/Q3 grezzi restituiti da Jolpica
+
+    Parametri:
+        qualifying_results: lista di dict da get_qualifying_results()
+
+    Ritorna:
+        La stessa lista, con 'qualifying_gap_seconds' aggiunta a ciascun dict
+    """
+    from src.features import _qualifying_time_to_seconds
+
+    for r in qualifying_results:
+        times = [_qualifying_time_to_seconds(r.get(k)) for k in ("q1", "q2", "q3")]
+        times = [t for t in times if t is not None]
+        r["best_time_sec"] = min(times) if times else None
+
+    valid_times = [r["best_time_sec"] for r in qualifying_results if r["best_time_sec"] is not None]
+    pole_time = min(valid_times) if valid_times else None
+
+    for r in qualifying_results:
+        if r["best_time_sec"] is not None and pole_time is not None:
+            r["qualifying_gap_seconds"] = r["best_time_sec"] - pole_time
+        else:
+            r["qualifying_gap_seconds"] = None
+
+    return qualifying_results
+
+def compute_live_weather(circuit_id, circuits_df, race_date):
+    """
+    Recupera la previsione meteo reale per la gara, usando lat/lng del circuito e la data della gara. Se il fetch fallisce (es. data
+    troppo lontana per l'orizzonte di previsione), ritorna valori None, gestiti a valle come fallback esplicito.
+
+    Parametri:
+        circuit_id: ID interno del circuito
+        circuits_df: DataFrame circuits.csv (colonne lat, lng)
+        race_date: data della gara, formato 'YYYY-MM-DD'
+
+    Ritorna:
+        dict con race_max_temp_c, race_precipitation_mm, race_is_wet
+    """
+    from src.weather_client import get_weather_forecast
+
+    circuit_row = circuits_df[circuits_df["circuitId"] == circuit_id]
+
+    if circuit_row.empty:
+        return {"race_max_temp_c": None, "race_precipitation_mm": None, "race_is_wet": None}
+
+    lat, lng = circuit_row.iloc[0]["lat"], circuit_row.iloc[0]["lng"]
+    forecast = get_weather_forecast(lat, lng, race_date)
+
+    if forecast is None:
+        return {"race_max_temp_c": None, "race_precipitation_mm": None, "race_is_wet": None}
+
+    return {
+        "race_max_temp_c": forecast["max_temp_c"],
+        "race_precipitation_mm": forecast["precipitation_mm"],
+        "race_is_wet": int(forecast["precipitation_mm"] > 1.0),
+    }

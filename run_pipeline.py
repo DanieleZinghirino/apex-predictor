@@ -45,7 +45,7 @@ print("3. Feature engineering...")
 df = build_all_features(
     df, data["circuits"], data["drivers"], data["constructors"],
     data["driver_standings"], data["constructor_standings"],
-    pd.read_csv(os.path.join(PROJECT_ROOT, "data", "raw", "qualifying.csv")),
+    data["qualifying"],
     n_races=10
 )
 

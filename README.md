@@ -1,22 +1,13 @@
-# Apex Predictor
+# Apex Predictor 🏎️
 
-Sistema di machine learning che prevede la probabilità che un pilota di Formula 1 finisca sul podio (top 3), usando dati storici (2004-2026, aggiornati automaticamente da fonte live) e un modello XGBoost ottimizzato.
-
-## Indice
-- [Come funziona, in breve](#come-funziona-in-breve)
-- [Setup](#setup)
-- [Workflow completo](#workflow-completo)
-- [Struttura del progetto](#struttura-del-progetto)
-- [Metodologia e decisioni chiave](#metodologia-e-decisioni-chiave)
-- [Risultati del modello](#risultati-del-modello)
-- [Roadmap](#roadmap)
+Sistema di machine learning che prevede la probabilità che un pilota di Formula 1 finisca sul podio (top 3), usando dati storici (2004-2026, aggiornati automaticamente da fonte live) e un modello XGBoost ottimizzato, con 22 feature su piloti, scuderie, circuiti, qualifica e meteo.
 
 ## Come funziona, in breve
 
 1. Dati storici F1 (Kaggle, 2004-2024) + aggiornamento automatico via API (Jolpica-F1, 2025-oggi)
-2. Feature engineering senza data leakage temporale (ogni feature usa solo gare precedenti a quella prevista)
-3. Modello XGBoost, validato e ottimizzato, calibrato per **precision alta** (il progetto genera previsioni condivise pubblicamente, dove un falso allarme è visibile e costa credibilità)
-4. Script che genera la previsione per la prossima gara reale, usando la griglia di qualifica ufficiale (o una stima, se non ancora disponibile)
+2. Feature engineering senza data leakage temporale
+3. Modello XGBoost, calibrato per **precision alta** (previsioni condivise pubblicamente, dove un falso allarme è visibile e costa credibilità)
+4. Previsione sulla prossima gara reale, con griglia e meteo effettivi quando disponibili, stimati altrimenti
 
 ## Setup
 
@@ -24,96 +15,41 @@ Sistema di machine learning che prevede la probabilità che un pilota di Formula
 git clone <url-repo>
 cd apex-predictor
 python3 -m venv venv
-source venv/bin/activate   # su Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ## Workflow completo
 
-Questi comandi vanno eseguiti **in ordine**, dalla root del progetto, con il virtual environment attivo.
-
-### 1. Scarica i dati storici (Kaggle, 2004-2024)
-
 ```bash
-python3 -c "print('Genera un token API da kaggle.com/settings → API → Create New Token')"
-# posiziona il token in ~/.kaggle/kaggle.json (chmod 600)
+# 1. Dati storici Kaggle (richiede token in ~/.kaggle/kaggle.json)
 ./scripts/download_data.sh
-```
 
-Scarica ed estrae automaticamente in `data/raw/`.
-
-### 2. Estendi lo storico con le stagioni recenti (Jolpica-F1)
-
-```bash
+# 2. Estendi con le stagioni recenti (risultati + qualifiche)
 python3 scripts/update_data.py
-```
 
-Scarica tutte le gare disputate dal 2025 a oggi non ancora presenti in locale, le integra nei CSV storici (con mappatura automatica di piloti/costruttori/circuiti nuovi). **Idempotente**: rieseguibile in qualunque momento, salta le gare già presenti. Fa un backup automatico prima di scrivere.
+# 3. Meteo storico (una tantum, o dopo un update_data.py)
+python3 scripts/fetch_weather.py
 
-### 3. Allena il modello
-
-```bash
+# 4. Allena il modello
 python3 run_pipeline.py
-```
 
-Carica i dati, costruisce le feature (piloti, scuderie, circuiti), allena XGBoost, trova la soglia di decisione ottimale sul test set più recente, valuta, e salva modello + configurazione in `models/`.
-
-### 4. Genera la previsione per la prossima gara
-
-```bash
+# 5. Previsione per la prossima gara (griglia/meteo reali se disponibili)
 python3 scripts/predict_next_race.py
-```
 
-Recupera automaticamente la prossima gara in calendario. Se la griglia di qualifica ufficiale è già disponibile, genera una previsione **DEFINITIVA**; altrimenti genera una previsione **ANTICIPATA**, con griglia stimata dalla forma recente dei piloti, sempre etichettata chiaramente come tale.
-
-### (Opzionale) Prova il modello su una gara già disputata
-
-```bash
+# (Opzionale) Demo su una gara già disputata
 python3 try_predictions.py
 ```
 
-Utile per verificare rapidamente il comportamento del modello senza aspettare una gara futura, confronta la previsione con il risultato reale già noto.
+## Feature del modello (22 totali)
 
-## Struttura del progetto
+**Piloti/scuderie**: forma recente (punti, posizione), affidabilità scuderia, storico su circuito, confronto col compagno di squadra, posizione in classifica generale, gara di casa.
 
-apex-predictor/
-├── data/
-│ ├── raw/ # dati grezzi Kaggle + backfill Jolpica (non versionati)
-│ ├── processed/ # dati puliti intermedi (non versionati)
-│ └── reference/ # dati curati dal progetto, VERSIONATI (es. caratteristiche circuiti)
-├── docs/ # documentazione di processo (es. prompt usati per dati esterni)
-├── notebooks/ # notebook di esplorazione: EDA, feature engineering, confronto modelli, tuning
-├── src/ # codice riutilizzabile e testato
-│ ├── data_loading.py # caricamento CSV, costruzione dataset di lavoro
-│ ├── features.py # feature engineering (piloti, scuderie, circuiti), no leakage
-│ ├── train.py # training, ricerca soglia, valutazione, salvataggio modello
-│ ├── predict.py # caricamento modello salvato, previsioni su nuovi dati
-│ ├── live_predict.py # costruzione feature per gare FUTURE (no shift necessario)
-│ └── jolpica_client.py # client per l'API Jolpica-F1
-├── scripts/ # script eseguibili standalone
-│ ├── download_data.sh # scarica il dataset storico da Kaggle
-│ ├── update_data.py # estende lo storico con le stagioni recenti
-│ └── predict_next_race.py # genera la previsione per la prossima gara
-├── models/ # modello addestrato + configurazione (non versionati)
-├── run_pipeline.py # pipeline di training end-to-end
-├── try_predictions.py # demo: previsione su gara già disputata
-├── requirements.txt
-└── README.md
+**Circuito**: lunghezza, curve, altitudine, carico aerodinamico (da tabella compilata con LLM, verificata su fonti multiple — dettaglio in `docs/circuit_data_prompt.md`), velocità media storica e indice di sorpassabilità (calcolati dai dati reali, non stimati).
 
+**Qualifica**: distacco dal poleman in secondi.
 
-## Metodologia e decisioni chiave
-
-**Range dati storici: 2004-2024** (poi esteso a 2025-2026 via API). Il tracciamento del giro veloce, introdotto nel 2004, si è rivelato fortemente predittivo del podio, motivo per cui il periodo precedente (2000-2003) è stato escluso a favore di un dataset completo su tutte le feature.
-
-**Target basato su `positionOrder`, non `position`**, perché quest'ultima è NaN per i ritiri, perdendo proprio i casi più utili da classificare come "non podio".
-
-**Feature engineering senza data leakage**: ogni feature (forma pilota, affidabilità scuderia, storico circuito) usa esclusivamente gare precedenti a quella prevista, verificato manualmente su singoli piloti prima di essere esteso a tutto il dataset. Per le gare future (dove non serve alcuno shift, dato che la gara non è nello storico), `src/live_predict.py` replica la stessa logica in una forma adattata.
-
-**Selezione del modello**: confrontati 8 algoritmi di classificazione, poi ottimizzati i due migliori (Random Forest, XGBoost) con `RandomizedSearchCV` + `TimeSeriesSplit` (validazione che rispetta l'ordine cronologico). XGBoost tunato è il modello finale, scelto per **precision alta**, il progetto genera previsioni pubbliche, dove un falso allarme è visibile e costa credibilità più di un podio mancato.
-
-**Feature sui circuiti**: caratteristiche fisiche (lunghezza, curve, direzione, altitudine, carico aerodinamico) da una tabella compilata con l'aiuto di un LLM, ridotta alle sole colonne con buona coerenza tra fonti multiple, le colonne più variabili sono state sostituite con equivalenti calcolati direttamente dallo storico gare (velocità media, indice di sorpassabilità), dati reali invece di stime esterne. Dettaglio completo in `docs/circuit_data_prompt.md`.
-
-Dettaglio completo del ragionamento in `notebooks/01_eda.ipynb` → `04_hyperparameter_tuning.ipynb`, in ordine.
+**Meteo**: temperatura massima, precipitazioni (Open-Meteo — archivio storico per il training, previsione per le gare future).
 
 ## Risultati del modello
 
@@ -121,45 +57,64 @@ Validato su gare mai viste in training (2025 e parte del 2026):
 
 | Metrica (classe Podio) | Valore |
 |---|---|
-| Precision | 0.650 |
-| Recall | 0.824 |
-| F1-score | 0.727 |
-| Accuracy complessiva | 0.91 |
-
-**Feature più importanti**: posizione in griglia (43%) e forma recente del pilota (28% in blocco) dominano; le feature sui circuiti (statiche + calcolate) contribuiscono complessivamente circa il 13%, non marginale ma neanche decisivo.
+| Precision | 0.624 |
+| Recall | 0.861 |
+| F1-score | 0.724 |
+| Accuracy | 0.90 |
+| Soglia | 0.65 |
 
 ### Evoluzione del modello
 
-Ogni cambiamento è stato misurato isolatamente, per capire quale contributo desse davvero:
+| Fase | Precision | Recall | F1 |
+|---|---|---|---|
+| XGBoost tunato, test 2023-2024 | 0.628 | 0.746 | 0.682 |
+| + backfill storico 2025-2026 | 0.629 | 0.833 | 0.717 |
+| + feature circuiti | 0.650 | 0.824 | 0.727 |
+| + gara di casa, standings, compagno, qualifica, meteo | 0.624 | 0.861 | 0.724 |
 
-| Fase | Precision | Recall | F1 | Cosa è cambiato |
-|---|---|---|---|---|
-| XGBoost tunato, test 2023-2024 | 0.628 | 0.746 | 0.682 | Modello base, prima del backfill |
-| + backfill storico 2025-2026 | 0.629 | 0.833 | 0.717 | Stesso modello/feature, più dati storici reali |
-| + feature sui circuiti | 0.650 | 0.824 | 0.727 | +6 feature (statiche + calcolate dallo storico) |
+L'ultimo set di feature non migliora F1 in modo netto, ma sposta il modello verso più recall — segnale che alcune delle nuove feature (es. qualifica, meteo) aggiungono varietà al segnale più che pura precisione. Nessun cambiamento drammatico, coerente con un modello ormai vicino a un plateau con questo tipo di dati tabellari.
 
-Il salto maggiore (+0.035 F1) viene dall'aver esteso lo storico con dati reali (2025-2026), non dalle feature sui circuiti (+0.010 F1), coerente con la feature importance, dove griglia e forma recente del pilota pesano insieme circa il 70%, contro il ~13% delle feature circuito. Un guadagno più piccolo ma comunque nella direzione giusta per l'obiettivo del progetto: precision più alta (+2 punti) a fronte di una recall quasi invariata.
+## Metodologia e decisioni chiave
 
-## Feature aggiuntive
+**Range dati: 2004-2024**, poi esteso a 2025-2026 via Jolpica-F1. Il tracciamento del giro veloce (dal 2004) è risultato fortemente predittivo, motivando questa scelta.
 
-Oltre alle feature di piloti/scuderie/circuiti, sono state aggiunte:
+**Target su `positionOrder`**, non `position` (NaN per i ritiri).
 
-- **Gara di casa** (pilota/scuderia), confronto tra nazionalità e paese del circuito
-- **Posizione in classifica generale** (pilota/costruttore) al momento della gara, presa dalla gara PRECEDENTE nello stesso anno, per evitare leakage (driver_standings.csv riflette la classifica dopo ogni gara, non prima)
-- **Confronto col compagno di squadra**, gap nella forma recente rispetto al compagno, isola l'abilità del pilota dalla qualità della macchina
-- **Distacco in qualifica dal poleman**, in secondi, calcolato dal miglior tempo tra Q1/Q2/Q3
-- **Meteo** (temperatura massima, precipitazioni), da Open-Meteo (API storica gratuita), tramite `scripts/fetch_weather.py`, salvato in `data/reference/race_weather.csv`
+**Nessun data leakage temporale**: ogni feature dinamica usa solo dati precedenti alla gara prevista — verificato manualmente su casi singoli prima di essere esteso a tutto il dataset. Standings: presi dalla gara precedente nello stesso anno (mai dalla gara corrente, che includerebbe già il suo risultato).
+
+**Modello**: confrontati 8 algoritmi, ottimizzati i due migliori con `RandomizedSearchCV` + `TimeSeriesSplit`. XGBoost tunato è il campione, scelto per precision alta.
+
+**Feature sui circuiti**: raccolte con un LLM, con istruzione esplicita di dichiarare i dati non verificabili. Le colonne meno coerenti tra risposte multiple sono state scartate a favore di equivalenti calcolati dai dati reali.
+
+Dettaglio completo in `notebooks/01_eda.ipynb` → `04_hyperparameter_tuning.ipynb`.
+
+## Struttura del progetto
+
+apex-predictor/
+├── data/
+│ ├── raw/ # dati grezzi Kaggle + backfill Jolpica (non versionati)
+│ └── reference/ # dati curati dal progetto, versionati (circuiti, meteo)
+├── docs/ # documentazione di processo
+├── notebooks/ # EDA, feature engineering, confronto modelli, tuning
+├── src/ # codice riutilizzabile e testato
+│ ├── data_loading.py, features.py, train.py, predict.py
+│ ├── live_predict.py # feature per gare future (no shift necessario)
+│ └── jolpica_client.py, weather_client.py
+├── scripts/ # script eseguibili standalone
+├── models/ # modello + configurazione (non versionati)
+├── run_pipeline.py, try_predictions.py
+├── requirements.txt
+└── README.md
+
 
 ## Stato del progetto
 
-🚧 In sviluppo, Set di feature esteso (circuiti, standings, compagno di squadra, qualifica, meteo) integrato e testato nella pipeline di training. **Nota**: `src/live_predict.py` (previsione sulla prossima gara) non è ancora aggiornato con queste 5 nuove feature, `scripts/predict_next_race.py` richiede questo aggiornamento prima di tornare a funzionare correttamente.
+✅ Pipeline completa end-to-end, funzionante e testata: training, backfill storico, previsione live (griglia e meteo reali quando disponibili).
 
 ## Roadmap
 
-- [x] Setup ambiente e struttura progetto
-- [x] Analisi esplorativa, feature engineering base, confronto modelli, tuning
-- [x] Backfill storico 2025-2026 via Jolpica-F1 (risultati + qualifiche)
-- [x] Feature sui circuiti (statiche + calcolate)
-- [x] Feature aggiuntive: gara di casa, standings, compagno di squadra, qualifica, meteo
-- [ ] Aggiornare `src/live_predict.py` con le 5 nuove feature (necessario per far tornare a funzionare le previsioni live)
+- [x] EDA, feature engineering, confronto modelli, tuning
+- [x] Backfill storico 2025-2026 (risultati, qualifiche, meteo)
+- [x] Feature complete: circuiti, gara di casa, standings, compagno di squadra, qualifica, meteo
+- [x] Previsione live con dati reali (non più fallback fissi)
 - [ ] Tappa 3: servire il modello via API + demo

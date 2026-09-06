@@ -1,0 +1,5 @@
+{
+  "threshold": 0.6500000000000001,
+  "model_file": "model_final.pkl",
+  "model_type": "XGBoost"
+}

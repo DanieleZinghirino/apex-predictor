@@ -35,7 +35,7 @@ def predict_podium(model, threshold, df):
     Parametri:
         model: modello addestrato
         threshold: soglia di decisione
-        df: DataFrame con le stesse FEATURE_COLS usate in training
+        df: DataFrame con le stesse FEATURE_COL usate in training
         
     Ritorna:
         Il DataFrame originale con due colonne aggiunte: 'podium_probability' e 'podium_predicted'

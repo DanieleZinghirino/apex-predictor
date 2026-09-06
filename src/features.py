@@ -19,7 +19,19 @@ NATIONALITY_TO_COUNTRY = {
     "Danish": "Denmark", "Japanese": "Japan", "Mexican": "Mexico",
     "Monegasque": "Monaco", "American": "USA", "Thai": "Thailand",
     "Chinese": "China", "New Zealander": "New Zealand",
-    # aggiungi altre nazionalità man mano che compaiono negli errori di merge
+    "Argentine": "Argentina", "Argentinian": "Argentina",
+    "Argentine-Italian": "Argentina", "American-Italian": "USA",
+    "Colombian": "Colombia", "Chilean": "Chile", "Czech": "Czech Republic",
+    "East German": "Germany", "Hungarian": "Hungary", "Indian": "India",
+    "Indonesian": "Indonesia", "Irish": "Ireland",
+    "Liechtensteiner": "Liechtenstein", "Malaysian": "Malaysia",
+    "Polish": "Poland", "Portuguese": "Portugal", "Rhodesian": "Zimbabwe",
+    "Russian": "Russia", "South African": "South Africa",
+    "Swedish": "Sweden", "Swiss": "Switzerland", "Uruguayan": "Uruguay",
+    "Venezuelan": "Venezuela", "Hong Kong": "Hong Kong",
+    "Korean": "Korea", "Saudi Arabian": "Saudi Arabia",
+    "Qatari": "Qatar", "Emirati": "UAE", "Turkish": "Turkey",
+    "Azerbaijani": "Azerbaijan",
 }
 
 def add_driver_recent_form(df, n_races=10):
@@ -228,8 +240,15 @@ def add_home_race_flags(df, drivers_df, constructors_df, circuits_df):
     """
     df = df.copy()
 
-    driver_country = drivers_df.set_index("driverId")["nationality"].map(NATIONALITY_TO_COUNTRY)
-    constructor_country = constructors_df.set_index("constructorId")["nationality"].map(NATIONALITY_TO_COUNTRY)
+    # .str.strip() pulisce eventuali spazi indesiderati nei dati grezzi
+    # (es. "Argentinian " osservato nei dati reali) prima del mapping
+    driver_nat = drivers_df["nationality"].str.strip()
+    constructor_nat = constructors_df["nationality"].str.strip()
+
+    driver_country = driver_nat.map(NATIONALITY_TO_COUNTRY)
+    driver_country.index = drivers_df["driverId"]
+    constructor_country = constructor_nat.map(NATIONALITY_TO_COUNTRY)
+    constructor_country.index = constructors_df["constructorId"]
     circuit_country = circuits_df.set_index("circuitId")["country"]
 
     df["_driver_country"] = df["driverId"].map(driver_country)
