@@ -12,25 +12,22 @@ from xgboost import XGBClassifier
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEATURE_COL = [
     "grid", "driver_recent_points_avg", "driver_recent_position_avg",
-    "constructor_reliability", "driver_circuit_avg_position", "no_circuit_history",
-    "circuit_avg_speed_history", "circuit_overtaking_index",
-    "circuit_length_km", "circuit_num_corners", "circuit_altitude_m",
-    "circuit_downforce_medium", "circuit_downforce_high",
-    "driver_home_race", "constructor_home_race",
+    "constructor_reliability", "driver_circuit_avg_position",
+    "circuit_overtaking_index", "circuit_avg_speed_history",
+    "circuit_num_corners",
     "driver_standing_position", "constructor_standing_position",
-    "teammate_position_gap",
-    "qualifying_gap_seconds",
-    "race_max_temp_c", "race_precipitation_mm", "race_is_wet",
+    "teammate_position_gap", "qualifying_gap_seconds",
+    "race_max_temp_c", "race_precipitation_mm",
 ]
 # Iperparametri del modello campione, trovati con RandomizedSearchCV +TimeSeriesSplit (vedi notebooks/04_hyperparameter_tuning.ipynb)
 XGB_CHAMPION_PARAMS = {
-    "n_estimators": 300,
-    "max_depth": 3,
+    "n_estimators": 400,
+    "max_depth": 4,
     "learning_rate": 0.01,
     "subsample": 0.6,
-    "colsample_bytree": 0.8,
-    "reg_alpha": 1,
-    "reg_lambda": 2,
+    "colsample_bytree": 0.6,
+    "reg_alpha": 0,
+    "reg_lambda": 1,
     "random_state": 42,
     "eval_metric": "logloss",
 }

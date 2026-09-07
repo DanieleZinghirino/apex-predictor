@@ -36,30 +36,32 @@ NATIONALITY_TO_COUNTRY = {
 
 def add_driver_recent_form(df, n_races=10):
     """
-    Aggiunge la forma recente del pilota: media punti e posizione finale sulle ultime n_races gare precedenti
-    
+    Aggiunge la forma recente del pilota: media mobile esponenziale (non aritmetica) di punti e posizione finale, calcolata su tutto
+    lo storico precedente con peso decrescente per le gare più vecchie.
+
     Parametri:
         df: DataFrame ordinato cronologicamente, con colonne 'driverId', 'points', 'positionOrder'
-        n_races: dimensione della finestra mobile (default 10)
-        
+        n_races: controlla il tasso di decadimento, valori più bassi pesano ancora di più le gare recentissime
+
     Ritorna:
-        Il Dataframe con due nuove colonne: 'driver_recent_point_avg', 'driver_recent_position_avg'
+        Il DataFrame con due nuove colonne: 'driver_recent_points_avg', 'driver_recent_position_avg'
     """
     df = df.copy()
 
     df["driver_recent_points_avg"] = (
         df.groupby("driverId")["points"]
-        .apply(lambda x: x.shift(1).rolling(n_races, min_periods=1).mean())
+        .apply(lambda x: x.shift(1).ewm(span=n_races, min_periods=1).mean())
         .reset_index(level=0, drop=True)
     )
 
     df["driver_recent_position_avg"] = (
-            df.groupby("driverId")["positionOrder"]
-            .apply(lambda x: x.shift(1).rolling(n_races, min_periods=1).mean())
-            .reset_index(level=0, drop=True)
+        df.groupby("driverId")["positionOrder"]
+        .apply(lambda x: x.shift(1).ewm(span=n_races, min_periods=1).mean())
+        .reset_index(level=0, drop=True)
     )
 
     return df
+
 
 def add_constructor_reliability(df, n_races=10):
     """
@@ -161,7 +163,7 @@ def add_circuit_static_characteristics(df, circuits_df, characteristics_path=Non
         characteristics_path: percorso del CSV; se None usa il default in data/reference/
 
     Ritorna:
-        Il DataFrame con le nuove colonne: 'circuit_length_km', 'circuit_num_corners', 'circuit_altitude_m', 'circuit_downforce_medium',
+        Il DataFrame con le nuove colonne: 'circuit_num_corners', 'circuit_downforce_medium',
         'circuit_downforce_high', 'circuit_data_missing'
         (flag: 1 se il circuito non è nella tabella di riferimento)
     """
@@ -189,7 +191,8 @@ def add_circuit_static_characteristics(df, circuits_df, characteristics_path=Non
         on="circuitId", how="left"
     )
 
-    # Flag esplicito per circuiti mancanti dalla tabella invece di lasciare NaN silenziosi
+    # Flag esplicito per circuiti mancanti dalla tabella invece di
+    # lasciare NaN silenziosi
     df["circuit_data_missing"] = df["circuit_length_km"].isnull().astype(int)
 
     return df

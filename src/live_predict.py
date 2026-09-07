@@ -116,23 +116,38 @@ def compute_circuit_history(driver_id, circuit_id, historical_df):
 
 
 def compute_driver_form(driver_id, historical_df, n_races=N_RACES_FORM):
+    """
+    Media mobile esponenziale di punti e posizione finale del pilota su tutto lo storico disponibile
+    """
     driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
 
     if driver_races.empty:
         return None, None
 
-    recent = driver_races.tail(n_races)
-    return recent["points"].mean(), recent["positionOrder"].mean()
+    points_avg = driver_races["points"].ewm(span=n_races, min_periods=1).mean().iloc[-1]
+    position_avg = driver_races["positionOrder"].ewm(span=n_races, min_periods=1).mean().iloc[-1]
+
+    return points_avg, position_avg
 
 
-def compute_driver_recent_grid_avg(driver_id, historical_df, n_races=5):
+def compute_driver_recent_grid_avg(driver_id, historical_df, n_races=6):
+    """
+    Stima la posizione di griglia per una gara futura usando la mediana delle ultime n_races griglie
+
+    Parametri:
+        driver_id: ID interno del pilota
+        historical_df: DataFrame storico
+        n_races: quante gare recenti considerare
+
+    Ritorna:
+        float, oppure None se nessuno storico disponibile
+    """
     driver_races = historical_df[historical_df["driverId"] == driver_id].sort_values("date")
 
     if driver_races.empty:
         return None
 
-    return driver_races.tail(n_races)["grid"].mean()
-
+    return driver_races["grid"].tail(n_races).median()
 
 def get_current_roster(historical_df, season):
     season_races = historical_df[historical_df["year"] == season]
