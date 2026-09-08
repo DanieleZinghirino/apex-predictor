@@ -102,6 +102,9 @@ def main():
 
     # Application è l'oggetto centrale di PTB, equivalente concettuale dell'oggetto FastAPI in api/main.py, a cui agganciamo gli handler
     app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("run", previsione))  # o "previsione", usa il nome esatto della tua funzione
+
 
     # CommandHandler collega il comando "/run" digitato dall'utente alla funzione previsione()
     # definita sopra; stesso concetto del decoratore @app.get(...) in FastAPI
@@ -110,7 +113,7 @@ def main():
 
     print("Bot avviato. In ascolto di messaggi... (Ctrl+C per fermare)")
     # run_polling(): il bot interroga continuamente i server Telegram
-    app.run_polling()
+    app.run_polling(stop_signals=None)
 
 
 if __name__ == "__main__":

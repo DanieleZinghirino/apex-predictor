@@ -129,6 +129,20 @@ def predict_next_race():
         ],
     }
 
+def run_telegram_bot():
+    """
+    Avvia il bot Telegram in un thread separato. Eventuali eccezioni vengono stampate esplicitamente
+    """
+    import sys, os
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+    try:
+        from bot.telegram_bot import main as bot_main
+        bot_main()
+    except Exception as e:
+        print(f"ERRORE: il bot Telegram si è fermato con un'eccezione: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 # StaticFiles serve file statici (HTML, CSS, immagini) da una cartella del disco, senza bisogno di scrivere una funzione dedicata per ognuno.
 # html=True cerca e serve automaticamente un index.html
