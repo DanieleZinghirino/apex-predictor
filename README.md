@@ -36,6 +36,7 @@ python3 scripts/fetch_weather.py         # meteo storico (Open-Meteo)
 python3 run_pipeline.py                  # training completo
 python3 scripts/predict_next_race.py     # previsione prossima gara
 python3 try_predictions.py               # demo su una gara già disputata
+```
 
 ## Interfaccia web
 
