@@ -141,6 +141,10 @@ def predict_next_race():
     predictions = predictions.merge(data["drivers"][["driverId", "surname"]], on="driverId", how="left")
     predictions = predictions.sort_values("podium_probability", ascending=False)
 
+    total_probability = predictions["podium_probability"].sum()
+
+    threshold_relative = (THRESHOLD / total_probability) * 100
+
     weather = None
     if "race_max_temp_c" in features_df.columns and not features_df.empty:
         weather = {
@@ -148,9 +152,6 @@ def predict_next_race():
             "precipitation_mm": round(float(features_df["race_precipitation_mm"].iloc[0]), 1),
         }
 
-    # Costruiamo qui la struttura JSON finale che il client riceverà.
-    # Nota i cast espliciti float()/bool(): i tipi numpy non sono serializzabili in JSON di default, vanno convertiti ai tipi Python nativi
-    # (float, bool, int) prima di restituirli, altrimenti FastAPI solleverebbe un errore di serializzazione
     return {
         "race_name": race_info["race_name"],
         "date": race_info["date"],
@@ -160,8 +161,8 @@ def predict_next_race():
             {
                 "driver": row["surname"],
                 "grid": round(float(row["grid"]), 1),
-                "probability": round(float(row["podium_probability"]), 4),
-                "predicted_podium": bool(row["podium_predicted"]),
+                "podium_share": round(float(row["podium_probability"] / total_probability * 100), 1),
+                "predicted_podium": bool((row["podium_probability"] / total_probability * 100) >= threshold_relative),
             }
             for _, row in predictions.iterrows()
         ],

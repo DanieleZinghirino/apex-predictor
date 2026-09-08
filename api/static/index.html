@@ -66,17 +66,17 @@
             tbody.innerHTML = ""; // svuota eventuali righe da un click precedente
 
             // forEach scorre l'array data.predictions e per ciascuno costruisce e aggiunge una riga <tr> alla tabella
-            data.predictions.forEach((p, index) => {
-                const pct = (p.probability * 100).toFixed(1);
+           data.predictions.forEach((p, index) => {
+                // p.podium_share è già una percentuale (es. 12.4),
+                // non serve più moltiplicare per 100 come prima
+                const pct = p.podium_share.toFixed(1);
                 const row = document.createElement("tr");
                 let trophy = "";
 
                 if (index < 3) {
-                    // Tra i primi 3 per probabilità
                     row.className = "podium-top3";
                     trophy = "🏆";
                 } else if (p.predicted_podium) {
-                    // Dal 4° posto in giù
                     row.className = "podium-predicted";
                 }
 

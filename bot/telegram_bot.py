@@ -84,7 +84,7 @@ async def previsione(update: Update, context: ContextTypes.DEFAULT_TYPE):
             marker = "🏆"  # primi 3 per probabilità: podio più probabile
         else:
             marker = "▫️"
-        pct = round(p["probability"] * 100, 1)
+        pct = round(p["podium_share"], 1)
         lines.append(f"{marker} {p['driver']} — griglia {p['grid']} — {pct}%")
 
     await message.reply_text("\n".join(lines))

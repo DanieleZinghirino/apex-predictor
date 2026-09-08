@@ -252,37 +252,72 @@ def build_upcoming_race_features(qualifying_df, historical_df, circuit_id, circu
 def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df, race_date=None):
     """
     Costruisce feature per una previsione anticipata prima delle qualifiche
+
+    Parametri:
+        historical_df: DataFrame storico
+        circuit_id: ID interno del circuito della prossima gara
+        season: anno della stagione corrente
+        circuits_df: DataFrame circuits.csv
+        race_date: data della gara, per il meteo (opzionale)
+
+    Ritorna:
+        DataFrame con le FEATURE_COL, più 'is_estimated_grid' per
+        marcare esplicitamente la stima
     """
     circuit_features = compute_circuit_features(circuit_id, historical_df, circuits_df)
     weather_features = compute_live_weather(circuit_id, circuits_df, race_date) if race_date else {}
-    roster = get_current_roster(historical_df, season)
-    rows = []
 
+    roster = get_current_roster(historical_df, season)
+
+    # Primo passaggio: calcoliamo tutti i valori grezzi per ciascun
+    # pilota, SENZA ancora assegnare la griglia finale — ci serve
+    # prima l'intero gruppo per poterli ordinare tra loro
+    raw_rows = []
     for _, r in roster.iterrows():
-        estimated_grid = compute_driver_recent_grid_avg(r["driverId"], historical_df)
+        estimated_grid_raw = compute_driver_recent_grid_avg(r["driverId"], historical_df)
         points_avg, position_avg = compute_driver_form(r["driverId"], historical_df)
         reliability = compute_constructor_reliability(r["constructorId"], historical_df)
         circuit_avg, no_history = compute_circuit_history(r["driverId"], circuit_id, historical_df)
         driver_pos, constructor_pos = _get_latest_standings(r["driverId"], r["constructorId"], historical_df)
 
-        if points_avg is None or estimated_grid is None:
+        if points_avg is None or estimated_grid_raw is None:
             continue
 
         if circuit_avg is None:
             circuit_avg = position_avg
 
-        row = {
+        raw_rows.append({
             "driverId": r["driverId"],
             "constructorId": r["constructorId"],
-            "grid": estimated_grid,
+            "estimated_grid_raw": estimated_grid_raw,  # solo per ordinare, non finisce nel modello
             "qualifying_gap_seconds": 0.0,
             "driver_recent_points_avg": points_avg,
-            "driver_recent_position_avg": position_avg,
+            "driver_recent_position_avg": position_avg,  # riusata anche come spareggio
             "constructor_reliability": reliability if reliability is not None else 1.0,
             "driver_circuit_avg_position": circuit_avg,
             "no_circuit_history": no_history,
             "driver_standing_position": driver_pos,
             "constructor_standing_position": constructor_pos,
+        })
+
+    # Ordiniamo per stima di griglia crescente; a parità di stima, il pilota con forma recente migliore (position_avg più basso) va davanti
+    raw_rows.sort(key=lambda x: (x["estimated_grid_raw"], x["driver_recent_position_avg"]))
+
+    # Secondo passaggio: assegniamo la griglia finale come semplice posizione nella lista ordinata
+    rows = []
+    for position, raw_row in enumerate(raw_rows, start=1):
+        row = {
+            "driverId": raw_row["driverId"],
+            "constructorId": raw_row["constructorId"],
+            "grid": position,  # <-- intero simulato, non più la stima grezza
+            "qualifying_gap_seconds": raw_row["qualifying_gap_seconds"],
+            "driver_recent_points_avg": raw_row["driver_recent_points_avg"],
+            "driver_recent_position_avg": raw_row["driver_recent_position_avg"],
+            "constructor_reliability": raw_row["constructor_reliability"],
+            "driver_circuit_avg_position": raw_row["driver_circuit_avg_position"],
+            "no_circuit_history": raw_row["no_circuit_history"],
+            "driver_standing_position": raw_row["driver_standing_position"],
+            "constructor_standing_position": raw_row["constructor_standing_position"],
             "is_estimated_grid": 1,
         }
         row.update(circuit_features)
@@ -291,6 +326,7 @@ def build_pre_qualifying_features(historical_df, circuit_id, season, circuits_df
 
     df = pd.DataFrame(rows)
     return _enrich_missing_feature_columns(df)
+
 
 def compute_live_qualifying_gaps(qualifying_results):
     """
