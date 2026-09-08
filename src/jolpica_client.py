@@ -69,36 +69,20 @@ def get_next_race_info():
         return None
 
     race = races[0]
+    circuit = race["Circuit"]
+    location = circuit.get("Location", {})
+
     return {
         "season": race["season"],
         "round": race["round"],
         "race_name": race["raceName"],
         "date": race["date"],
-        "circuit_ref": race["Circuit"]["circuitId"],
+        "circuit_ref": circuit["circuitId"],
+        "circuit_name": circuit.get("circuitName", circuit["circuitId"]),
+        "circuit_country": location.get("country"),
+        "circuit_lat": location.get("lat"),
+        "circuit_lng": location.get("long"),
     }
-
-
-def get_season_races(season):
-    """
-    Ritorna l'elenco di tutte le gare di una stagione, con round edata, usato per sapere QUALI round esistono prima di provare a scaricarne i risultati
-    Parametri:
-        season: anno
-
-    Ritorna:
-        Lista di dizionari con round, race_name, date, circuit_ref ordinata per round crescente
-    """
-    data = _get(f"{season}/races/")
-    races = data["MRData"]["RaceTable"]["Races"]
-
-    return [
-        {
-            "round": int(r["round"]),
-            "race_name": r["raceName"],
-            "date": r["date"],
-            "circuit_ref": r["Circuit"]["circuitId"],
-        }
-        for r in races
-    ]
 
 
 def get_qualifying_results(season, round_number):
@@ -171,3 +155,32 @@ def get_race_results(season, round_number):
         }
         for entry in races[0]["Results"]
     ]
+
+def get_season_races(season):
+    """
+    Ritorna l'elenco di tutte le gare di una stagione, con round, data e dettagli completi del circuito
+
+    Parametri:
+        season: anno
+
+    Ritorna:
+        Lista di dizionari con round, race_name, date, circuit_ref, circuit_name, circuit_country, circuit_lat, circuit_lng
+    """
+    data = _get(f"{season}/races/")
+    races = data["MRData"]["RaceTable"]["Races"]
+
+    result = []
+    for r in races:
+        circuit = r["Circuit"]
+        location = circuit.get("Location", {})
+        result.append({
+            "round": int(r["round"]),
+            "race_name": r["raceName"],
+            "date": r["date"],
+            "circuit_ref": circuit["circuitId"],
+            "circuit_name": circuit.get("circuitName", circuit["circuitId"]),
+            "circuit_country": location.get("country"),
+            "circuit_lat": location.get("lat"),
+            "circuit_lng": location.get("long"),
+        })
+    return result

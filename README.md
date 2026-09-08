@@ -1,4 +1,4 @@
-# Apex Predictor 🏎️
+# Apex Predictor
 
 Sistema di machine learning che prevede la probabilità che un pilota di Formula 1 finisca sul podio (top 3), usando dati storici (2004-2026, aggiornati automaticamente da fonte live) e un modello XGBoost, con 14 feature selezionate dopo un'analisi rigorosa di importanza
 
@@ -7,6 +7,7 @@ Sistema di machine learning che prevede la probabilità che un pilota di Formula
 1. Dati storici F1 (Kaggle, 2004-2024) + aggiornamento automatico via API (Jolpica-F1, 2025-oggi)
 2. Feature engineering senza data leakage temporale, con media mobile esponenziale per pesare la forma recente
 3. Modello XGBoost, validato con `TimeSeriesSplit`, calibrato per **precision alta**
+4. Previsione sulla prossima gara reale, con griglia e meteo effettivi quando disponibili, stimati altrimenti; **circuiti debuttanti gestiti automaticamente**
 
 ## Setup
 
@@ -29,12 +30,12 @@ Esegue in sequenza: aggiornamento storico (Jolpica), backfill qualifiche mancant
 **Script individuali**, se serve eseguirli separatamente:
 ```bash
 ./scripts/download_data.sh          # dataset storico Kaggle (una tantum)
-python3 scripts/update_data.py       # nuove gare da Jolpica-F1
-python3 scripts/backfill_qualifying.py  # tempi di qualifica mancanti
-python3 scripts/fetch_weather.py     # meteo storico (Open-Meteo)
-python3 run_pipeline.py              # training completo
-python3 scripts/predict_next_race.py # previsione prossima gara
-python3 try_predictions.py           # demo su una gara già disputata
+python3 scripts/update_data.py           # nuove gare da Jolpica-F1
+python3 scripts/backfill_qualifying.py   # tempi di qualifica mancanti
+python3 scripts/fetch_weather.py         # meteo storico (Open-Meteo)
+python3 run_pipeline.py                  # training completo
+python3 scripts/predict_next_race.py     # previsione prossima gara
+python3 try_predictions.py               # demo su una gara già disputata
 ```
 
 ## Feature del modello (14, dopo selezione)

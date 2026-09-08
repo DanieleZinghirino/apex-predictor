@@ -252,6 +252,47 @@ def build_qualifying_rows(race, driver_map, constructor_map, new_race_id, qualif
 
     return qualifying_df
 
+def resolve_or_create_circuit(race, circuit_map, circuits_df):
+    """
+    Trova il circuitId corrispondente a un circuito; se non esiste ancora nello storico locale (circuito debuttante), crea automaticamente una nuova riga in circuits.csv 
+    usando lat/long/paese forniti direttamente da Jolpica
+
+    Parametri:
+        race: dict con circuit_ref, circuit_name, circuit_country, circuit_lat, circuit_lng
+        circuit_map: dict {circuitRef: circuitId} da aggiornare in place
+        circuits_df: DataFrame circuits.csv, a cui aggiungere eventualmente la nuova riga
+
+    Ritorna:
+        tupla (circuit_id, circuits_df_aggiornato)
+    """
+    ref = race["circuit_ref"]
+
+    if ref in circuit_map:
+        return circuit_map[ref], circuits_df
+
+    if not race.get("circuit_lat") or not race.get("circuit_lng"):
+        # Senza coordinate non possiamo calcolare il meteo per questo circuito in futuro
+        print(f"  ATTENZIONE: circuito '{ref}' nuovo ma senza coordinate valide da Jolpica, salto la creazione")
+        return None, circuits_df
+
+    new_id = int(circuits_df["circuitId"].max()) + 1
+    circuit_map[ref] = new_id
+
+    new_row = {
+        "circuitId": new_id,
+        "circuitRef": ref,
+        "name": race["circuit_name"],
+        "location": race.get("circuit_country", ""),
+        "country": race.get("circuit_country", ""),
+        "lat": float(race["circuit_lat"]),
+        "lng": float(race["circuit_lng"]),
+    }
+
+    circuits_df = pd.concat([circuits_df, pd.DataFrame([new_row])], ignore_index=True)
+    print(f"  Nuovo circuito creato automaticamente: {ref} -> circuitId={new_id} (lat={new_row['lat']}, lng={new_row['lng']})")
+
+    return new_id, circuits_df
+
 
 def main():
     print("Caricamento dati locali...")
@@ -270,12 +311,13 @@ def main():
 
     drivers_df = data["drivers"]
     constructors_df = data["constructors"]
+    circuits_df = data["circuits"]
     races_df = data["races"]
     results_df = data["results"]
 
     data_dir = os.path.join(PROJECT_ROOT, "data", "raw")
 
-    # Backup UNA volta sola, prima di iniziare, non ad ogni gara
+    # Backup una volta sola, prima di iniziare, non ad ogni gara
     backup_dir = os.path.join(data_dir, "backup_pre_update")
     os.makedirs(backup_dir, exist_ok=True)
     for fname in ["races.csv", "results.csv", "drivers.csv", "constructors.csv"]:
@@ -287,6 +329,15 @@ def main():
 
     for race in new_races:
         print(f"\nScaricamento: {race['season']} round {race['round']} — {race['race_name']}")
+        # Risolvi o crea il circuito prima di scaricare i risultati
+        circuit_id, circuits_df = resolve_or_create_circuit(race, circuit_map, circuits_df)
+
+        if circuit_id is None:
+            print(f"  Impossibile risolvere il circuito, gara saltata.")
+            continue
+
+        circuits_df.to_csv(os.path.join(data_dir, "circuits.csv"), index=False)
+
         results = get_race_results(race["season"], race["round"])
 
         if not results:
