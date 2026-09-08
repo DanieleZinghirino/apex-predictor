@@ -36,6 +36,25 @@ python3 scripts/fetch_weather.py         # meteo storico (Open-Meteo)
 python3 run_pipeline.py                  # training completo
 python3 scripts/predict_next_race.py     # previsione prossima gara
 python3 try_predictions.py               # demo su una gara già disputata
+
+## Interfaccia web
+
+Oltre agli script da terminale, il progetto espone un'API REST (FastAPI) con una pagina web che genera la previsione con un click.
+
+**Avvio rapido (dati/modello già aggiornati):**
+```bash
+./scripts/start_api.sh
+```
+Apri `http://localhost:8000` nel browser.
+
+**Avvio con aggiornamento completo (dati, modello, poi server):**
+```bash
+./scripts/update_and_serve.sh
+```
+
+**Importante**: il modello viene caricato in memoria una sola volta, all'avvio del server. Se viene aggiornato dati/modello (`run_all.sh`) mentre il server è già acceso, bisogna riavviarlo (Ctrl+C, poi `./scripts/start_api.sh`) per usare il modello aggiornato, altrimenti continuerà a servire previsioni con quello vecchio.
+
+**Documentazione interattiva dell'API**: `http://localhost:8000/docs`, generata automaticamente da FastAPI, permette di testare l'endpoint `/predict/next-race` direttamente dal browser senza passare dalla pagina web.
 ```
 
 ## Feature del modello (14, dopo selezione)
@@ -104,18 +123,23 @@ Quando un circuito debutta (es. Madring/GP Spagna 2026) e non è nel dataset sto
 ## Struttura del progetto
 
 apex-predictor/
+├── api/
+│ ├── main.py # API REST (FastAPI)
+│ └── static/index.html # interfaccia web
 ├── data/
 │ ├── raw/ # dati grezzi Kaggle + backfill Jolpica (non versionati)
 │ └── reference/ # dati curati dal progetto, versionati (circuiti, meteo)
 ├── docs/ # documentazione di processo (prompt LLM per dati circuiti)
+├── models/ # modello + configurazione (non versionati)
 ├── notebooks/ # EDA, feature engineering, confronto modelli, tuning, analisi finale
 ├── src/ # codice riutilizzabile e testato
 │ ├── data_loading.py, features.py, train.py, predict.py
 │ ├── live_predict.py # feature per gare future (no shift necessario)
 │ └── jolpica_client.py, weather_client.py
 ├── scripts/ # script eseguibili standalone
-│ └── run_all.sh # workflow completo in un comando
-├── models/ # modello + configurazione (non versionati)
+│ ├── run_all.sh # aggiorna dati + riallena modello
+│ ├── start_api.sh # avvia il server
+│ └── update_and_serve.sh # entrambi in sequenza
 ├── run_pipeline.py, try_predictions.py
 ├── requirements.txt
 └── README.md
@@ -132,5 +156,5 @@ apex-predictor/
 - [x] Feature complete, poi selezionate a 14 dopo analisi SHAP
 - [x] Correzione stima griglia (mediana robusta agli outlier)
 - [x] Workflow in un comando (`run_all.sh`)
-- [ ] Interfaccia grafica minima per le previsioni
-- [ ] Tappa 3: servire il modello via API
+- [x] Interfaccia web (FastAPI + pagina HTML)
+- [ ] Bot Telegram (stesso backend, framework diverso)

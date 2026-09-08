@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Apex Predictor</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; background: #0d1117; color: #e6edf3; }
+        h1 { color: #ff1e1e; text-align: center; }
+        .button-wrap { display: flex; justify-content: center; margin: 30px 0; }
+        button { background: #ff1e1e; color: white; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-size: 15px; }
+        #meta { color: #8b949e; margin: 20px 0 30px 0; line-height: 1.8; text-align: center; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #30363d; }
+        th { color: #8b949e; font-weight: 600; }
+        /* Podio vero (primi 3 per probabilità): verde, con trofeo */
+        .podium-top3 { background: rgba(46, 204, 113, 0.15); font-weight: 600; }
+        /* Oltre il 3° posto ma comunque sopra la soglia del modello: rosso, senza trofeo */
+        .podium-predicted { background: rgba(255, 30, 30, 0.15); font-weight: 600; }
+        .bar { height: 6px; background: #30363d; border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 100%; background: #ff1e1e; }
+        #loading { display: none; } /* nascosto di default, mostrato solo durante il caricamento */
+    </style>
+</head>
+<body>
+    <h1> Apex Predictor </h1>
+    <!-- onclick="loadPrediction()" collega il click del bottone alla funzione JavaScript definita sotto, appena l'utente clicca, parte la chiamata all'API -->
+    <div class="button-wrap">
+        <button onclick="loadPrediction()">Previsione podio per la prossima gara</button>
+    </div>
+    <p id="loading">Caricamento...</p>
+    <div id="meta"></div>
+    <!-- La tabella parte nascosta (style="display:none") e viene mostrata solo quando i dati sono pronti, per evitare di vedere una tabella vuota prima del click -->
+    <table id="results" style="display:none">
+        <thead>
+            <tr><th>Pilota</th><th>Griglia</th><th>Probabilità di podio</th><th></th></tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+    </table>
+
+    <script>
+        // "async function" permette di usare "await" dentro: il codice si "mette in pausa" ad ogni await senza bloccare il browser, riprendendo quando la risposta arriva
+        async function loadPrediction() {
+            document.getElementById("loading").style.display = "block";
+            document.getElementById("results").style.display = "none";
+
+            // fetch() è la funzione JavaScript nativa per fare richieste HTTP dal browser
+            // qui chiama esattamente l'endpoint /predict/next-race definito in api/main.py.
+            // Il path è relativo perché la pagina viene servita dallo stesso server FastAPI; se fosse ospitata altrove, servirebbe l'URL completo
+            const response = await fetch("/predict/next-race");
+            // .json() converte il corpo della risposta HTTP in un oggetto JavaScript navigabile
+            const data = await response.json();
+
+            document.getElementById("loading").style.display = "none";
+
+            const label = data.is_definitive ? "DEFINITIVA (griglia reale)" : "ANTICIPATA (griglia stimata)";
+            let metaHtml = `<strong>${data.race_name}</strong> — ${data.date}<br>Previsione: ${label}`;
+            if (data.weather) {
+                const wetLabel = data.weather.precipitation_mm > 1 ? "pioggia probabile" : "asciutto";
+                metaHtml += `<br>Meteo: ${data.weather.temp_c}°C, ${wetLabel}`;
+            }
+            // innerHTML inserisce il testo dentro l'elemento con id="meta", sostituisce completamente il contenuto precedente
+            document.getElementById("meta").innerHTML = metaHtml;
+
+            const tbody = document.getElementById("results-body");
+            tbody.innerHTML = ""; // svuota eventuali righe da un click precedente
+
+            // forEach scorre l'array data.predictions e per ciascuno costruisce e aggiunge una riga <tr> alla tabella
+            data.predictions.forEach((p, index) => {
+                const pct = (p.probability * 100).toFixed(1);
+                const row = document.createElement("tr");
+                let trophy = "";
+
+                if (index < 3) {
+                    // Tra i primi 3 per probabilità
+                    row.className = "podium-top3";
+                    trophy = "🏆";
+                } else if (p.predicted_podium) {
+                    // Dal 4° posto in giù
+                    row.className = "podium-predicted";
+                }
+
+                row.innerHTML = `
+                    <td>${p.driver}</td>
+                    <td>${p.grid}</td>
+                    <td>${pct}%<div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+                    <td>${trophy}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            document.getElementById("results").style.display = "table";
+        }
+    </script>
+</body>
+</html>
