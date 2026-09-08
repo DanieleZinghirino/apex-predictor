@@ -6,7 +6,13 @@ __pycache__/
 .env
 
 # Data
-data/*
+data/raw/lap_times.csv
+data/raw/pit_stops.csv
+data/raw/sprint_results.csv
+data/processed/
 
 # Models
-models/*token.txt
+models/*
+!models/model_final.pkl
+!models/model_config.json
+
