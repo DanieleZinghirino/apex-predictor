@@ -5,6 +5,8 @@ Espone la logica di previsione già validata in src/ come servizio HTTP, consuma
 Telegram (bot/telegram_bot.py), nessuna logica duplicata tra i due client.
 """
 import sys
+from contextlib import asynccontextmanager
+import threading
 import os
 # Aggiunge la cartella superiore (la root del progetto) al path di ricerca di Python
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -19,8 +21,44 @@ from src.jolpica_client import get_next_race_info, get_qualifying_results
 from src.live_predict import map_refs_to_ids, build_upcoming_race_features, build_pre_qualifying_features
 from src.predict import load_trained_model, predict_podium
 
+
+def run_telegram_bot():
+    """
+    Avvia il bot Telegram in un thread separato. Eventuali eccezioni
+    vengono stampate esplicitamente, altrimenti spariscono silenziosamente
+    nel thread daemon.
+    """
+    import sys
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+    try:
+        from bot.telegram_bot import main as bot_main
+        bot_main()
+    except Exception as e:
+        print(f"ERRORE: il bot Telegram si è fermato con un'eccezione: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Sostituisce il vecchio @app.on_event("startup"), rimosso nelle
+    versioni più recenti di Starlette/FastAPI (da cui dipendevamo
+    senza fissare la versione in requirements-deploy.txt). Tutto ciò
+    che sta PRIMA di 'yield' gira all'avvio del server; ciò che sta
+    DOPO (qui assente) girerebbe allo spegnimento.
+    """
+    if os.environ.get("TELEGRAM_BOT_TOKEN"):
+        thread = threading.Thread(target=run_telegram_bot, daemon=True)
+        thread.start()
+        print("Bot Telegram avviato in background.")
+    else:
+        print("TELEGRAM_BOT_TOKEN non impostato, bot non avviato.")
+    yield  # il server gira qui, tra startup e shutdown
+
+
 # FastAPI() crea l'applicazione vera e propria, l'oggetto a cui agganciamo tutte le rotte (gli URL) che il server saprà gestire.
-app = FastAPI(title="Apex Predictor API", version="1.0")
+app = FastAPI(title="Apex Predictor API", version="1.0", lifespan=lifespan)
 
 # CORS = Cross-Origin Resource Sharing. I browser, per sicurezza, bloccano di default le richieste JavaScript verso un dominio diverso da quello che ha servito la pagina
 # allow_origins=["*"] disabilita questo controllo per qualisasi origine
@@ -128,21 +166,6 @@ def predict_next_race():
             for _, row in predictions.iterrows()
         ],
     }
-
-def run_telegram_bot():
-    """
-    Avvia il bot Telegram in un thread separato. Eventuali eccezioni vengono stampate esplicitamente
-    """
-    import sys, os
-    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-    try:
-        from bot.telegram_bot import main as bot_main
-        bot_main()
-    except Exception as e:
-        print(f"ERRORE: il bot Telegram si è fermato con un'eccezione: {e}")
-        import traceback
-        traceback.print_exc()
-
 
 # StaticFiles serve file statici (HTML, CSS, immagini) da una cartella del disco, senza bisogno di scrivere una funzione dedicata per ognuno.
 # html=True cerca e serve automaticamente un index.html
