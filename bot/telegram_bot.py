@@ -16,8 +16,8 @@ load_dotenv()
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 # URL dell'API FastAPI che il bot interroga
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
-
+_default_port = os.environ.get("PORT", "8000")
+API_URL = os.environ.get("API_URL", f"http://localhost:{_default_port}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
