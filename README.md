@@ -56,7 +56,7 @@ Apri `http://localhost:8000` nel browser.
 **Importante**: il modello viene caricato in memoria una sola volta, all'avvio del server. Se viene aggiornato dati/modello (`run_all.sh`) mentre il server è già acceso, bisogna riavviarlo (Ctrl+C, poi `./scripts/start_api.sh`) per usare il modello aggiornato, altrimenti continuerà a servire previsioni con quello vecchio.
 
 **Documentazione interattiva dell'API**: `http://localhost:8000/docs`, generata automaticamente da FastAPI, permette di testare l'endpoint `/predict/next-race` direttamente dal browser senza passare dalla pagina web.
-```
+
 
 ## Feature del modello (14, dopo selezione)
 
