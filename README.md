@@ -57,6 +57,22 @@ Apri `http://localhost:8000` nel browser.
 
 **Documentazione interattiva dell'API**: `http://localhost:8000/docs`, generata automaticamente da FastAPI, permette di testare l'endpoint `/predict/next-race` direttamente dal browser senza passare dalla pagina web.
 
+## Bot Telegram
+
+Oltre all'API e alla pagina web, il progetto include un bot Telegram (`python-telegram-bot`) che espone la stessa previsione via chat — nessuna logica duplicata, il bot chiama l'API FastAPI via HTTP.
+
+**Setup:**
+1. Crea un bot con [@BotFather](https://t.me/BotFather) su Telegram, ottieni il token
+2. Crea un file `.env` nella root del progetto:
+TELEGRAM_BOT_TOKEN=il-tuo-token
+3. Assicurati che l'API sia in esecuzione (`./scripts/start_api.sh`)
+4. Avvia il bot:
+```bash
+   python3 bot/telegram_bot.py
+```
+
+**Comandi:** `/start` (istruzioni), `/run` (genera la previsione per la prossima gara).
+
 
 ## Feature del modello (14, dopo selezione)
 
@@ -127,6 +143,8 @@ apex-predictor/
 ├── api/
 │ ├── main.py # API REST (FastAPI)
 │ └── static/index.html # interfaccia web
+├── bot/
+│ └── telegram_bot.py
 ├── data/
 │ ├── raw/ # dati grezzi Kaggle + backfill Jolpica (non versionati)
 │ └── reference/ # dati curati dal progetto, versionati (circuiti, meteo)
@@ -158,4 +176,4 @@ apex-predictor/
 - [x] Correzione stima griglia (mediana robusta agli outlier)
 - [x] Workflow in un comando (`run_all.sh`)
 - [x] Interfaccia web (FastAPI + pagina HTML)
-- [ ] Bot Telegram (stesso backend, framework diverso)
+- [ ] Hosting gratuito (API + bot raggiungibili senza tenere il PC acceso)
