@@ -78,6 +78,11 @@ async def previsione(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     lines.append("")  # riga vuota come separatore visivo
 
+    # Il favorito per la vittoria, in evidenza separata prima della lista podio
+    top_winner = max(data["predictions"], key=lambda p: p["winner_share"])
+    lines.append(f"🥇 Favorito vittoria: {top_winner['driver']} ({top_winner['winner_share']}%)")
+    lines.append("")
+
     # Mostriamo solo i primi 8 piloti per non superare il limite di lunghezza dei messaggi Telegram (4096 caratteri) e per leggibilità
     for i, p in enumerate(data["predictions"][:6]):
         if i < 3:
