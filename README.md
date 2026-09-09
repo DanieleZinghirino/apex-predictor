@@ -36,7 +36,7 @@ Documentazione interattiva: `https://apex-predictor.onrender.com/docs`
 ## Eseguirlo in locale (per contribuire o modificare il codice)
 
 ```bash
-git clone <url-repo>
+git clone https://github.com/DanieleZinghirino/apex-predictor
 cd apex-predictor
 python3 -m venv venv
 source venv/bin/activate
