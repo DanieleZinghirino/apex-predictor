@@ -20,7 +20,7 @@ Nessun account, nessun setup, gratuito. Il servizio gratuito si "addormenta" dop
 ## Guida rapida, interfacce disponibili
 
 ### Pagina web
-Apri [apex-predictor.onrender.com](https://apex-predictor.onrender.com), clicca **"Genera previsione prossima gara"**. La tabella mostra, per ciascun pilota: griglia (reale o stimata), quota podio con evidenziazione (🟢 primi 3, 🔴 altri sopra soglia), quota vittoria.
+Apri [apex-predictor.onrender.com](https://apex-predictor.onrender.com), clicca **"Genera previsione prossima gara"**. La tabella mostra, per ciascun pilota: griglia (reale o stimata), quota podio con evidenziazione, quota vittoria.
 
 ### Bot Telegram
 Cerca **@f1podiumbot** su Telegram, avvia la chat:
