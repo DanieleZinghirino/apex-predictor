@@ -2,6 +2,10 @@
 
 Sistema di machine learning che prevede la probabilità che un pilota di Formula 1 finisca sul podio (top 3), usando dati storici (2004-2026, aggiornati automaticamente da fonte live) e un modello XGBoost, con 14 feature selezionate dopo un'analisi rigorosa di importanza
 
+## Links
+
+https://apex-predictor.onrender.com o Bot Telegram @f1podiumbot
+
 ## Come funziona, in breve
 
 1. Dati storici F1 (Kaggle, 2004-2024) + aggiornamento automatico via API (Jolpica-F1, 2025-oggi)
@@ -59,7 +63,7 @@ Apri `http://localhost:8000` nel browser.
 
 ## Bot Telegram
 
-Oltre all'API e alla pagina web, il progetto include un bot Telegram (`python-telegram-bot`) che espone la stessa previsione via chat — nessuna logica duplicata, il bot chiama l'API FastAPI via HTTP.
+Oltre all'API e alla pagina web, il progetto include un bot Telegram (`python-telegram-bot`) che espone la stessa previsione via chat, nessuna logica duplicata, il bot chiama l'API FastAPI via HTTP.
 
 **Setup:**
 1. Crea un bot con [@BotFather](https://t.me/BotFather) su Telegram, ottieni il token
@@ -123,7 +127,7 @@ Validato su gare mai viste in training (2025 e parte del 2026):
 
 **Verifica pre-rimozione**: prima di scartare le 8 feature deboli, ciascuna è stata controllata singolarmente per escludere che il basso contributo fosse dovuto a un bug di implementazione piuttosto che a segnale genuinamente assente.
 
-## Limiti noti, documentati onestamente
+## Limiti noti
 
 **Precipitazione giornaliera, non oraria**: `race_is_wet` si basa sul totale di pioggia nell'intera giornata, non specificamente durante l'orario di gara, può sovrastimare le gare "bagnate".
 
@@ -136,6 +140,10 @@ Validato su gare mai viste in training (2025 e parte del 2026):
 ## Gestione di circuiti nuovi in calendario
 
 Quando un circuito debutta (es. Madring/GP Spagna 2026) e non è nel dataset storico Kaggle, va aggiunto manualmente a `data/raw/circuits.csv` e `data/reference/circuit_characteristics.csv` prima di generare previsioni, il sistema non lo fa automaticamente. Coordinate e caratteristiche vanno verificate da fonti affidabili (Wikipedia, sito ufficiale del circuito).
+
+## Esperimenti di deep learning (esplorativi)
+
+Per validare la scelta di XGBoost, sono stati testati 4 approcci di deep learning (PyTorch): MLP con embedding categorici, LSTM sulla sequenza grezza di gare, TabNet, GNN sulle relazioni compagno di squadra, stessa metodologia di valutazione, stesso split temporale. Nessuno ha superato XGBoost (F1 0.717); TabNet il più vicino (F1 0.711). Risultato coerente con la letteratura: gradient boosting resta generalmente superiore su dataset tabellari di questa dimensione (~8500 righe). Dettaglio in `notebooks/06`-`10`.
 
 ## Struttura del progetto
 
