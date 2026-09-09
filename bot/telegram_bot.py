@@ -103,7 +103,7 @@ def _build_header(data):
 async def podium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Gestisce il comando /podium: 
-    mostra SOLO la probabilità di arrivare a podio (top 3), ordinata per quota podio decrescente
+    mostra solo la probabilità di arrivare a podio (top 3), ordinata per quota podio decrescente
     """
     data = await _fetch_prediction(update)
     if data is None:
@@ -119,7 +119,7 @@ async def podium(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines.append("")
 
     # Mostriamo solo i primi 8 piloti per non superare il limite di lunghezza dei messaggi Telegram (4096 caratteri) e per leggibilità
-    for i, p in enumerate(data["predictions"][:8]):
+    for i, p in enumerate(data["predictions"][:5]):
         if i < 3:
             marker = "🏆"  # primi 3 per probabilità: podio più probabile
         elif p["predicted_podium"]:
@@ -127,7 +127,7 @@ async def podium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             marker = "▫️"
         pct = round(p["podium_share"], 1)
-        lines.append(f"{marker} {p['driver']} — griglia {p['grid']} — {pct}%")
+        lines.append(f"{marker} {p['driver']}) Posizione in griglia: {int(p['grid'])}; {pct}%")
 
     await message.reply_text("\n".join(lines))
 
@@ -153,9 +153,9 @@ async def victory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sorted_by_winner = sorted(data["predictions"], key=lambda p: p["winner_share"], reverse=True)
 
     for i, p in enumerate(sorted_by_winner[:5]):
-        marker = "🥇" if i == 0 else "▫️"
+        marker = "🥇" if i == 0 else "🔴"
         pct = round(p["winner_share"], 1)
-        lines.append(f"{marker} {p['driver']} — griglia {p['grid']} — {pct}%")
+        lines.append(f"{marker} {p['driver']}) Posizione in griglia: {int(p['grid'])}; {pct}%")
 
     await message.reply_text("\n".join(lines))
 
