@@ -15,4 +15,6 @@ data/processed/
 models/*
 !models/model_final.pkl
 !models/model_config.json
+!models/model_winner.pkl
+!models/model_winner_config.json
 
