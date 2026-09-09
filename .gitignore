@@ -18,3 +18,4 @@ models/*
 !models/model_winner.pkl
 !models/model_winner_config.json
 
+*.Zone.Identifier
