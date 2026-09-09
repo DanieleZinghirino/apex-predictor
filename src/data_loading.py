@@ -58,6 +58,7 @@ def build_working_dataset(races, results, min_year=2004):
     )
 
     df["podium"] = df["positionOrder"] <= 3
+    df["winner"] = df["positionOrder"] == 1
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["date", "driverId"]).reset_index(drop=True)
 

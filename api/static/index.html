@@ -33,7 +33,7 @@
     <!-- La tabella parte nascosta (style="display:none") e viene mostrata solo quando i dati sono pronti, per evitare di vedere una tabella vuota prima del click -->
     <table id="results" style="display:none">
         <thead>
-            <tr><th>Pilota</th><th>Griglia</th><th>Probabilità di podio</th><th></th></tr>
+            <tr><th>Pilota</th><th>Griglia</th><th>Probabilità podio (%)</th><th></th><th>Probabilità vittoria (%)</th></tr>
         </thead>
         <tbody id="results-body"></tbody>
     </table>
@@ -85,6 +85,7 @@
                     <td>${p.grid}</td>
                     <td>${pct}%<div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div></td>
                     <td>${trophy}</td>
+                    <td>${p.winner_share}%${p.predicted_winner ? " 🥇" : ""}</td>
                 `;
                 tbody.appendChild(row);
             });

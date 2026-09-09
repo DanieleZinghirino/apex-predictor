@@ -70,3 +70,21 @@ print("8. Salvataggio modello...")
 save_model(model, threshold=best["threshold"])
 
 print("\nPipeline completata con successo.")
+
+print("\n=== Modello VINCITORE (in aggiunta al modello podio) ===")
+
+print("9. Training del modello vincitore...")
+winner_model = train_champion_model(train_df, target_col="winner")
+
+print("10. Ricerca soglia ottimale (vincitore)...")
+best_winner = find_best_threshold(winner_model, test_df, target_col="winner")
+print(f"    Soglia ottimale: {best_winner['threshold']:.2f}")
+print(f"    Precision: {best_winner['precision']:.3f}, Recall: {best_winner['recall']:.3f}, F1: {best_winner['f1']:.3f}")
+
+print("\n11. Valutazione completa (vincitore)...")
+print(evaluate_model(winner_model, test_df, threshold=best_winner["threshold"], target_col="winner"))
+
+print("12. Salvataggio modello vincitore...")
+save_model(winner_model, threshold=best_winner["threshold"], name="model_winner")
+
+print("\nPipeline completata con successo (podio + vincitore).")

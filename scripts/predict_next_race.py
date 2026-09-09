@@ -95,18 +95,37 @@ else:
         historical_df, circuit_id, int(race_info["season"]), data["circuits"], race_date=race_info["date"]
     )
 
-print("Caricamento modello e generazione previsioni...")
-model, threshold = load_trained_model()
-predictions = predict_podium(model, threshold, features_df)
+print("Caricamento modelli e generazione previsioni...")
+model_podium, threshold_podium = load_trained_model(name="model_final")
+model_winner, threshold_winner = load_trained_model(name="model_winner")
+
+predictions = predict_podium(model_podium, threshold_podium, features_df)
+
+predictions = predict_podium(model_podium, threshold_podium, features_df)
+
+winner_predictions = predict_podium(model_winner, threshold_winner, features_df)
+predictions["winner_probability"] = winner_predictions["podium_probability"]
+
+# Quota relativa: normalizziamo le probabilità di vittoria in modo che
+# sommino a 100% sull'intero gruppo, stesso principio già applicato al
+# podio — "quanto pesa questo pilota SUL TOTALE delle chance di vittoria"
+total_winner_probability = predictions["winner_probability"].sum()
+predictions["winner_share"] = predictions["winner_probability"] / total_winner_probability * 100
+
+# La soglia va riscalata con lo STESSO fattore, per restare
+# matematicamente equivalente alla soglia calibrata in training (0.85)
+threshold_winner_relative = (threshold_winner / total_winner_probability) * 100
+predictions["winner_predicted"] = predictions["winner_share"] >= threshold_winner_relative
 
 predictions = predictions.merge(
     data["drivers"][["driverId", "surname"]], on="driverId", how="left"
 )
 
-result = predictions[["surname", "grid", "podium_probability", "podium_predicted", "is_estimated_grid"]] \
-    .sort_values("podium_probability", ascending=False)
-result.columns = ["Pilota", "Griglia", "Probabilità podio", "Predetto", "Griglia stimata"]
-
+result = predictions[[
+    "surname", "grid", "podium_probability", "podium_predicted",
+    "winner_share", "winner_predicted", "is_estimated_grid"
+]].sort_values("podium_probability", ascending=False)
+result.columns = ["Pilota", "Griglia", "Prob. podio", "Pred. podio", "Quota vittoria (%)", "Pred. vittoria", "Griglia stimata"]
 
 label = "DEFINITIVA" if qualifying else "ANTICIPATA (griglia stimata)"
 # Il meteo è uguale per tutti i piloti della stessa gara, lo mostriamo una sola volta come intestazione, non ripetuto su ogni riga
@@ -118,3 +137,6 @@ if "race_max_temp_c" in features_df.columns and not features_df.empty:
 
 print(f"\nPrevisione {label} per {race_info['race_name']}:\n")
 print(result.to_string(index=False))
+
+top_winner = predictions.sort_values("winner_share", ascending=False).iloc[0]
+print(f"\n🏆 Pilota favorito per la vittoria: {top_winner['surname']} ({top_winner['winner_share']:.1f}%)")

@@ -42,11 +42,7 @@ def run_telegram_bot():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Sostituisce il vecchio @app.on_event("startup"), rimosso nelle
-    versioni più recenti di Starlette/FastAPI (da cui dipendevamo
-    senza fissare la versione in requirements-deploy.txt). Tutto ciò
-    che sta PRIMA di 'yield' gira all'avvio del server; ciò che sta
-    DOPO (qui assente) girerebbe allo spegnimento.
+    Sostituisce il vecchio @app.on_event("startup"), rimosso nelle versioni più recenti di Starlette/FastAPI
     """
     if os.environ.get("TELEGRAM_BOT_TOKEN"):
         thread = threading.Thread(target=run_telegram_bot, daemon=True)
@@ -71,9 +67,10 @@ app.add_middleware(
 
 # Il modello viene caricato qui, a livello di modulo
 # MODEL e THRESHOLD restano poi disponibili a tutte le funzioni sotto senza doverli ricaricare
-print("Caricamento modello all'avvio del server...")
-MODEL, THRESHOLD = load_trained_model()
-print("Modello caricato.")
+print("Caricamento modelli all'avvio del server...")
+MODEL_PODIUM, THRESHOLD_PODIUM = load_trained_model(name="model_final")
+MODEL_WINNER, THRESHOLD_WINNER = load_trained_model(name="model_winner")
+print("Modelli caricati.")
 
 
 # Il decoratore @app.get(...) indica una funzione di callback all'arrivo di una richiesta HTTP GET su questo URL. 
@@ -137,13 +134,18 @@ def predict_next_race():
         is_definitive = False
 
     # MODEL e THRESHOLD sono le variabili globali caricate una volta sola all'avvio
-    predictions = predict_podium(MODEL, THRESHOLD, features_df)
+    predictions = predict_podium(MODEL_PODIUM, THRESHOLD_PODIUM, features_df)
+    winner_preds = predict_podium(MODEL_WINNER, THRESHOLD_WINNER, features_df)
+    predictions["winner_probability"] = winner_preds["podium_probability"]
+
     predictions = predictions.merge(data["drivers"][["driverId", "surname"]], on="driverId", how="left")
     predictions = predictions.sort_values("podium_probability", ascending=False)
 
     total_probability = predictions["podium_probability"].sum()
+    threshold_relative = (THRESHOLD_PODIUM / total_probability) * 100
 
-    threshold_relative = (THRESHOLD / total_probability) * 100
+    total_winner_probability = predictions["winner_probability"].sum()
+    threshold_winner_relative = (THRESHOLD_WINNER / total_winner_probability) * 100
 
     weather = None
     if "race_max_temp_c" in features_df.columns and not features_df.empty:
@@ -163,6 +165,8 @@ def predict_next_race():
                 "grid": round(float(row["grid"]), 1),
                 "podium_share": round(float(row["podium_probability"] / total_probability * 100), 1),
                 "predicted_podium": bool((row["podium_probability"] / total_probability * 100) >= threshold_relative),
+                "winner_share": round(float(row["winner_probability"] / total_winner_probability * 100), 1),
+                "predicted_winner": bool((row["winner_probability"] / total_winner_probability * 100) >= threshold_winner_relative),
             }
             for _, row in predictions.iterrows()
         ],
