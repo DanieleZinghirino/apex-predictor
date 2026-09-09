@@ -127,7 +127,7 @@ async def podium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             marker = "▫️"
         pct = round(p["podium_share"], 1)
-        lines.append(f"{marker} {p['driver']}) Posizione in griglia: {int(p['grid'])}; {pct}%")
+        lines.append(f"{marker} {p['driver']}) Partenza: {int(p['grid'])}; Prob. podio: {pct}%")
 
     await message.reply_text("\n".join(lines))
 
@@ -155,7 +155,7 @@ async def victory(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, p in enumerate(sorted_by_winner[:5]):
         marker = "🥇" if i == 0 else "🔴"
         pct = round(p["winner_share"], 1)
-        lines.append(f"{marker} {p['driver']}) Posizione in griglia: {int(p['grid'])}; {pct}%")
+        lines.append(f"{marker} {p['driver']}) Partenza: {int(p['grid'])}; Prob. vittoria: {pct}%")
 
     await message.reply_text("\n".join(lines))
 
